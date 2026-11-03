@@ -1,0 +1,918 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "煤炭销售管理系统 API",
+    "description": "煤炭销售管理系统前后端分离接口文档（RESTful）。所有接口统一返回 Result 结构：{code, message, data}。除登录外均需携带 Authorization: Bearer <token>。",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8080/api", "description": "开发环境" }
+  ],
+  "tags": [
+    { "name": "认证管理", "description": "登录、退出、修改密码" },
+    { "name": "客户管理", "description": "客户档案 CRUD" },
+    { "name": "商品管理", "description": "煤种商品 CRUD" },
+    { "name": "数据字典", "description": "业务参数维护" },
+    { "name": "合同管理", "description": "合同录入、提交、审核" },
+    { "name": "订单管理", "description": "销售订单 CRUD 与取消" },
+    { "name": "磅单管理", "description": "称重发运：建单、录皮重、录毛重、作废" },
+    { "name": "库存管理", "description": "库存查询、流水、入库、盘点" },
+    { "name": "结算管理", "description": "结算单生成、审核、作废" },
+    { "name": "回款管理", "description": "回款登记与核销" },
+    { "name": "报表统计", "description": "销售趋势、排行、回款率、库存预警" },
+    { "name": "系统管理", "description": "用户、角色、菜单、日志" }
+  ],
+  "components": {
+    "schemas": {
+      "Result": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "description": "200成功；400参数错误；401未认证；403越权；404不存在；500系统异常；1001业务异常；1002状态非法", "example": 200 },
+          "message": { "type": "string", "example": "操作成功" },
+          "data": { "description": "业务数据" }
+        }
+      },
+      "PageResult": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "example": 200 },
+          "message": { "type": "string", "example": "操作成功" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "records": { "type": "array", "items": { "type": "object" } },
+              "total": { "type": "integer", "example": 120 },
+              "page": { "type": "integer", "example": 1 },
+              "size": { "type": "integer", "example": 10 }
+            }
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string", "example": "admin" },
+          "password": { "type": "string", "example": "123456" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiJ9..." },
+          "userInfo": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer", "example": 1 },
+              "username": { "type": "string", "example": "admin" },
+              "realName": { "type": "string", "example": "系统管理员" },
+              "roleCode": { "type": "string", "example": "ADMIN" },
+              "menus": { "type": "array", "items": { "type": "string" }, "example": ["/dashboard", "/system/user"] }
+            }
+          }
+        }
+      },
+      "CustomerRequest": {
+        "type": "object",
+        "required": ["customerName"],
+        "properties": {
+          "customerName": { "type": "string", "description": "客户单位名称", "example": "华能某电厂" },
+          "contactName": { "type": "string", "example": "王经理" },
+          "phone": { "type": "string", "example": "13800000001" },
+          "address": { "type": "string", "example": "内蒙古鄂尔多斯市" },
+          "invoiceInfo": { "type": "string", "description": "开票信息", "example": "税号 9115..." },
+          "creditLimit": { "type": "number", "description": "信用额度（元）", "example": 500000 },
+          "region": { "type": "string", "example": "内蒙古" },
+          "remark": { "type": "string" }
+        }
+      },
+      "ProductRequest": {
+        "type": "object",
+        "required": ["productName"],
+        "properties": {
+          "productName": { "type": "string", "description": "煤种名称", "example": "烟煤" },
+          "spec": { "type": "string", "description": "规格", "example": "末煤" },
+          "qnetAr": { "type": "integer", "description": "收到基低位发热量 kcal/kg", "example": 5500 },
+          "sulfur": { "type": "number", "description": "硫分 %", "example": 1.2 },
+          "ash": { "type": "number", "description": "灰分 %", "example": 18 },
+          "origin": { "type": "string", "example": "内蒙古鄂尔多斯" },
+          "basePrice": { "type": "number", "description": "基准价 元/吨", "example": 520 },
+          "safeStock": { "type": "number", "description": "安全库存 吨", "example": 1500 },
+          "status": { "type": "integer", "description": "1上架 0下架", "example": 1 },
+          "remark": { "type": "string" }
+        }
+      },
+      "ContractRequest": {
+        "type": "object",
+        "required": ["customerId", "productId", "totalQty", "price"],
+        "properties": {
+          "customerId": { "type": "integer", "example": 1 },
+          "productId": { "type": "integer", "example": 1 },
+          "signDate": { "type": "string", "format": "date", "example": "2026-10-26" },
+          "startDate": { "type": "string", "format": "date", "example": "2026-11-01" },
+          "endDate": { "type": "string", "format": "date", "example": "2027-10-31" },
+          "totalQty": { "type": "number", "description": "约定总量 吨", "example": 5000 },
+          "price": { "type": "number", "description": "含税单价 元/吨", "example": 520 },
+          "taxRate": { "type": "number", "description": "税率 %", "example": 13 },
+          "qnetAr": { "type": "integer", "description": "约定热值", "example": 5500 },
+          "shortRate": { "type": "number", "description": "溢短装比例 %", "example": 5 },
+          "payType": { "type": "integer", "description": "1预付 2货到付款 3账期", "example": 3 },
+          "creditDays": { "type": "integer", "description": "账期天数", "example": 30 },
+          "transportBear": { "type": "integer", "description": "1客户自提 2供方送货", "example": 1 }
+        }
+      },
+      "AuditRequest": {
+        "type": "object",
+        "required": ["pass"],
+        "properties": {
+          "pass": { "type": "boolean", "example": true },
+          "opinion": { "type": "string", "example": "同意执行" }
+        }
+      },
+      "OrderRequest": {
+        "type": "object",
+        "required": ["contractId", "planQty"],
+        "properties": {
+          "contractId": { "type": "integer", "description": "合同 id（必填）", "example": 8 },
+          "planQty": { "type": "number", "description": "计划数量 吨", "example": 300 },
+          "price": { "type": "number", "description": "价格快照，默认合同价", "example": 520 },
+          "priceRemark": { "type": "string", "description": "手动改价理由", "example": "" },
+          "deliveryDate": { "type": "string", "format": "date", "example": "2026-11-05" },
+          "plateNo": { "type": "string", "example": "晋B12345" }
+        }
+      },
+      "OrderUpdateRequest": {
+        "type": "object",
+        "description": "只传要改的字段。合同/客户/煤种不可改；计划量不得小于已发运量；改价必须填 priceRemark",
+        "properties": {
+          "planQty": { "type": "number", "example": 350 },
+          "price": { "type": "number", "example": 515 },
+          "priceRemark": { "type": "string", "example": "客户加量议价" },
+          "deliveryDate": { "type": "string", "format": "date" },
+          "plateNo": { "type": "string" }
+        }
+      },
+      "TicketCreateRequest": {
+        "type": "object",
+        "required": ["orderId", "plateNo"],
+        "properties": {
+          "orderId": { "type": "integer", "description": "订单 id（必填，磅单必须挂订单）", "example": 15 },
+          "plateNo": { "type": "string", "example": "晋B12345" },
+          "driver": { "type": "string", "example": "张三" },
+          "tareSource": { "type": "integer", "description": "1现场称重 2备案套用", "example": 1 }
+        }
+      },
+      "TareRequest": {
+        "type": "object",
+        "required": ["tareWeight"],
+        "properties": {
+          "tareWeight": { "type": "number", "description": "皮重 吨", "example": 16.8 },
+          "tareTime": { "type": "string", "example": "2026-10-26 09:15:00" }
+        }
+      },
+      "GrossRequest": {
+        "type": "object",
+        "required": ["grossWeight"],
+        "properties": {
+          "grossWeight": { "type": "number", "description": "毛重 吨", "example": 49.85 },
+          "grossTime": { "type": "string", "example": "2026-10-26 10:30:00" }
+        }
+      },
+      "CancelReasonRequest": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string", "description": "作废/取消原因（必填）", "example": "毛重录入错误" }
+        }
+      },
+      "SettlementCreateRequest": {
+        "type": "object",
+        "required": ["contractId", "ticketIds"],
+        "properties": {
+          "contractId": { "type": "integer", "example": 8 },
+          "ticketIds": {
+            "type": "array",
+            "description": "勾选的已完成未结算磅单 id",
+            "items": { "type": "integer" },
+            "example": [101, 102, 103]
+          }
+        }
+      },
+      "PaymentRequest": {
+        "type": "object",
+        "required": ["customerId", "amount"],
+        "properties": {
+          "customerId": { "type": "integer", "example": 1 },
+          "amount": { "type": "number", "example": 50000 },
+          "payType": { "type": "integer", "description": "1银行转账 2现金 3承兑汇票", "example": 1 },
+          "payTime": { "type": "string", "example": "2026-10-26 14:00:00" },
+          "remark": { "type": "string", "example": "银行回单号 20261026-001" }
+        }
+      },
+      "WriteOffRequest": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "核销明细，合计不得超过回款金额",
+            "items": {
+              "type": "object",
+              "properties": {
+                "settleId": { "type": "integer", "example": 20 },
+                "amount": { "type": "number", "example": 30000 }
+              }
+            }
+          }
+        }
+      },
+      "StockChangeRequest": {
+        "type": "object",
+        "required": ["productId", "changeQty"],
+        "properties": {
+          "productId": { "type": "integer", "example": 1 },
+          "changeQty": { "type": "number", "description": "变动数量 吨，入库为正、盘亏为负", "example": 200 },
+          "remark": { "type": "string", "example": "矿上进货" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Bearer <token>"
+      }
+    }
+  },
+  "security": [ { "Bearer": [] } ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["认证管理"],
+        "summary": "登录",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Result" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/LoginResponse" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "密码错误次数超限锁定，或账号密码错误" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["认证管理"],
+        "summary": "退出登录",
+        "responses": { "200": { "description": "成功，data 为空" } }
+      }
+    },
+    "/users/{id}/password": {
+      "put": {
+        "tags": ["认证管理"],
+        "summary": "修改密码",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["oldPassword", "newPassword"],
+                "properties": {
+                  "oldPassword": { "type": "string", "example": "123456" },
+                  "newPassword": { "type": "string", "description": "长度≥8", "example": "abc12345" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/customers": {
+      "get": {
+        "tags": ["客户管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string" }, "description": "名称关键字" },
+          { "name": "region", "in": "query", "schema": { "type": "string" } },
+          { "name": "onlyMine", "in": "query", "schema": { "type": "boolean" }, "description": "只看我的（C2 归属人筛选）" }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["客户管理"],
+        "summary": "新增客户",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/customers/{id}": {
+      "get": {
+        "tags": ["客户管理"],
+        "summary": "客户详情",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" }, "404": { "description": "不存在" } }
+      },
+      "put": {
+        "tags": ["客户管理"],
+        "summary": "修改客户",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CustomerRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      },
+      "delete": {
+        "tags": ["客户管理"],
+        "summary": "删除客户（逻辑删除）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" }, "1001": { "description": "该客户存在关联单据，不可删除" } }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["商品管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "integer", "description": "1上架 0下架" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["商品管理"],
+        "summary": "新增煤种商品",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["商品管理"],
+        "summary": "商品详情",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      },
+      "put": {
+        "tags": ["商品管理"],
+        "summary": "修改商品",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProductRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      },
+      "delete": {
+        "tags": ["商品管理"],
+        "summary": "删除商品（逻辑删除）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/dicts": {
+      "get": {
+        "tags": ["数据字典"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "dictType", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["数据字典"],
+        "summary": "新增字典项",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dictType", "dictKey", "dictValue"],
+                "properties": {
+                  "dictType": { "type": "string", "example": "biz_param" },
+                  "dictKey": { "type": "string", "example": "order_over_delivery_rate" },
+                  "dictValue": { "type": "string", "example": "0.03" },
+                  "remark": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/dicts/type/{type}": {
+      "get": {
+        "tags": ["数据字典"],
+        "summary": "按类型取全部键值（前端下拉/参数读取）",
+        "parameters": [ { "name": "type", "in": "path", "required": true, "schema": { "type": "string", "example": "biz_param" } } ],
+        "responses": { "200": { "description": "键值对列表" } }
+      }
+    },
+    "/dicts/{id}": {
+      "put": {
+        "tags": ["数据字典"],
+        "summary": "修改字典项",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "dictValue": { "type": "string" }, "remark": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "成功" } }
+      },
+      "delete": {
+        "tags": ["数据字典"],
+        "summary": "删除字典项（逻辑删除）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/contracts": {
+      "get": {
+        "tags": ["合同管理"],
+        "summary": "分页查询（列表带剩余可下单量）",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "status", "in": "query", "schema": { "type": "integer", "description": "0草稿 1待审核 2执行中 3已完成 4已终止" } },
+          { "name": "customerId", "in": "query", "schema": { "type": "integer" } },
+          { "name": "productId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["合同管理"],
+        "summary": "新建合同（保存为草稿）",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ContractRequest" } } } },
+        "responses": { "200": { "description": "成功，返回合同 id" } }
+      }
+    },
+    "/contracts/{id}": {
+      "get": {
+        "tags": ["合同管理"],
+        "summary": "合同详情（含客户/煤种信息）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      },
+      "put": {
+        "tags": ["合同管理"],
+        "summary": "修改合同（仅草稿/被退回可改）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ContractRequest" } } } },
+        "responses": { "200": { "description": "成功" }, "1002": { "description": "当前状态不允许修改" } }
+      },
+      "delete": {
+        "tags": ["合同管理"],
+        "summary": "删除合同（仅草稿可删）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" }, "1002": { "description": "仅草稿可删除" } }
+      }
+    },
+    "/contracts/{id}/submit": {
+      "post": {
+        "tags": ["合同管理"],
+        "summary": "提交审核（草稿→待审核）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/contracts/{id}/audit": {
+      "post": {
+        "tags": ["合同管理"],
+        "summary": "审核合同（待审核→执行中/驳回）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditRequest" } } } },
+        "responses": { "200": { "description": "成功" }, "403": { "description": "仅销售经理可审核；不得审核本人创建的合同" } }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["订单管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "status", "in": "query", "schema": { "type": "integer", "description": "1待发运 2部分发运 3已完成 4已取消" } },
+          { "name": "customerId", "in": "query", "schema": { "type": "integer" } },
+          { "name": "contractId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["订单管理"],
+        "summary": "新建订单（校验合同余量与信用额度）",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderRequest" } } } },
+        "responses": {
+          "200": { "description": "成功" },
+          "1001": { "description": "合同剩余量不足 / 客户信用额度超限（订单标记超信用待审批）" }
+        }
+      }
+    },
+    "/orders/available": {
+      "get": {
+        "tags": ["订单管理"],
+        "summary": "可过磅订单列表（待发运/部分发运，磅房选单用）",
+        "responses": { "200": { "description": "订单列表" } }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": ["订单管理"],
+        "summary": "订单详情（含合同、磅单列表）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      },
+      "put": {
+        "tags": ["订单管理"],
+        "summary": "修改订单（计划量/单价/发货日期/车牌）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderUpdateRequest" } } } },
+        "responses": {
+          "200": { "description": "成功" },
+          "1001": { "description": "计划量不得小于已发运量 / 合同余量不足（排除本单原量）" },
+          "1002": { "description": "已完成/已取消订单不可修改" }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "tags": ["订单管理"],
+        "summary": "取消订单（仅未发运；已发运不可取消）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" }, "1002": { "description": "已产生磅单，不可取消" } }
+      }
+    },
+    "/weigh-tickets": {
+      "get": {
+        "tags": ["磅单管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "status", "in": "query", "schema": { "type": "integer", "description": "0待称皮重 1已称皮重 2已完成 3已作废" } },
+          { "name": "orderId", "in": "query", "schema": { "type": "integer" } },
+          { "name": "plateNo", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["磅单管理"],
+        "summary": "新建磅单（磅房选订单后创建）",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TicketCreateRequest" } } } },
+        "responses": { "200": { "description": "成功，返回磅单 id" } }
+      }
+    },
+    "/weigh-tickets/available": {
+      "get": {
+        "tags": ["磅单管理"],
+        "summary": "可结算磅单列表（已完成且未结算，销售员做结算用）",
+        "parameters": [
+          { "name": "contractId", "in": "query", "required": true, "schema": { "type": "integer" }, "description": "按合同筛选" }
+        ],
+        "responses": { "200": { "description": "磅单列表" } }
+      }
+    },
+    "/weigh-tickets/{id}/tare": {
+      "put": {
+        "tags": ["磅单管理"],
+        "summary": "录皮重（待称皮重→已称皮重）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TareRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/weigh-tickets/{id}/gross": {
+      "put": {
+        "tags": ["磅单管理"],
+        "summary": "录毛重（核心事务：算净重→扣库存→写流水→累加订单发运量）",
+        "description": "净重=毛重−皮重，校验 20~40 吨区间；同事务完成磅单置完成、扣库存、写库存流水、订单已发运量累加；超发超阈值转待审批",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrossRequest" } } } },
+        "responses": {
+          "200": { "description": "成功" },
+          "1001": { "description": "毛重小于皮重 / 净重超出合理区间" }
+        }
+      }
+    },
+    "/weigh-tickets/{id}/cancel": {
+      "post": {
+        "tags": ["磅单管理"],
+        "summary": "作废磅单（仅未结算可作废，自动回滚库存与发运量）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CancelReasonRequest" } } } },
+        "responses": {
+          "200": { "description": "成功" },
+          "1002": { "description": "已进入结算单，不可作废（需先撤销结算单）" }
+        }
+      }
+    },
+    "/stocks": {
+      "get": {
+        "tags": ["库存管理"],
+        "summary": "库存列表（含安全库存与预警标记）",
+        "responses": { "200": { "description": "库存列表" } }
+      }
+    },
+    "/stock-records": {
+      "get": {
+        "tags": ["库存管理"],
+        "summary": "库存流水分页",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "productId", "in": "query", "schema": { "type": "integer" } },
+          { "name": "sourceType", "in": "query", "schema": { "type": "string", "description": "INBOUND/TICKET/CHECK" } },
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      }
+    },
+    "/stock-records/inbound": {
+      "post": {
+        "tags": ["库存管理"],
+        "summary": "采购入库（写库存+流水）",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StockChangeRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/stock-records/check": {
+      "post": {
+        "tags": ["库存管理"],
+        "summary": "盘点调整（盘盈正/盘亏负，写流水+备注）",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StockChangeRequest" } } } },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/settlements": {
+      "get": {
+        "tags": ["结算管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "status", "in": "query", "schema": { "type": "integer", "description": "0待审核 1已审核 2已作废" } },
+          { "name": "customerId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["结算管理"],
+        "summary": "生成结算单（勾选磅单，按合同价算金额）",
+        "description": "totalAmount = Σ明细金额（R36），明细金额 = 磅单净重 × 单价",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettlementCreateRequest" } } } },
+        "responses": { "200": { "description": "成功，返回结算单 id" } }
+      }
+    },
+    "/settlements/{id}": {
+      "get": {
+        "tags": ["结算管理"],
+        "summary": "结算单详情（含明细列表）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/settlements/{id}/audit": {
+      "post": {
+        "tags": ["结算管理"],
+        "summary": "审核结算单（待审核→已审核，计入应收）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuditRequest" } } } },
+        "responses": { "200": { "description": "成功" }, "403": { "description": "仅财务可审核；不得审核本人创建的结算单" } }
+      }
+    },
+    "/settlements/{id}/cancel": {
+      "post": {
+        "tags": ["结算管理"],
+        "summary": "作废结算单（未核销才可作废）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CancelReasonRequest" } } } },
+        "responses": { "200": { "description": "成功" }, "1002": { "description": "已核销，不可作废（需先撤销核销）" } }
+      }
+    },
+    "/payments": {
+      "get": {
+        "tags": ["回款管理"],
+        "summary": "分页查询",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "customerId", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["回款管理"],
+        "summary": "登记回款",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentRequest" } } } },
+        "responses": { "200": { "description": "成功，返回回款 id" } }
+      }
+    },
+    "/payments/{id}/write-off": {
+      "post": {
+        "tags": ["回款管理"],
+        "summary": "核销（一笔回款冲抵多张结算单）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WriteOffRequest" } } } },
+        "responses": {
+          "200": { "description": "成功" },
+          "1001": { "description": "核销金额合计超过回款金额 / 结算单状态不允许核销" }
+        }
+      }
+    },
+    "/customers/{id}/receivable": {
+      "get": {
+        "tags": ["回款管理"],
+        "summary": "客户应收账款（已审核未核销金额，实时计算）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "应收金额" } }
+      }
+    },
+    "/reports/sales-trend": {
+      "get": {
+        "tags": ["报表统计"],
+        "summary": "销售趋势（按结算审核日聚合）",
+        "parameters": [
+          { "name": "startDate", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "ECharts 数据结构" } }
+      }
+    },
+    "/reports/coal-rank": {
+      "get": {
+        "tags": ["报表统计"],
+        "summary": "煤种销量排行（按磅单净重）",
+        "parameters": [
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "排行数据" } }
+      }
+    },
+    "/reports/customer-rank": {
+      "get": {
+        "tags": ["报表统计"],
+        "summary": "客户消费 TOP10（按结算金额）",
+        "parameters": [
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "排行数据" } }
+      }
+    },
+    "/reports/payment-rate": {
+      "get": {
+        "tags": ["报表统计"],
+        "summary": "回款率统计",
+        "parameters": [
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "回款率数据" } }
+      }
+    },
+    "/reports/stock-warning": {
+      "get": {
+        "tags": ["报表统计"],
+        "summary": "库存预警（低于安全库存的商品）",
+        "responses": { "200": { "description": "预警列表" } }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["系统管理"],
+        "summary": "用户分页",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      },
+      "post": {
+        "tags": ["系统管理"],
+        "summary": "新增用户",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password", "roleId"],
+                "properties": {
+                  "username": { "type": "string", "example": "sales01" },
+                  "password": { "type": "string", "description": "明文传入，服务端 BCrypt 后入库", "example": "123456" },
+                  "realName": { "type": "string", "example": "张三" },
+                  "phone": { "type": "string" },
+                  "roleId": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "tags": ["系统管理"],
+        "summary": "修改用户（含启用/禁用）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "realName": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "roleId": { "type": "integer" },
+                  "status": { "type": "integer", "description": "1启用 0禁用" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "成功" } }
+      },
+      "delete": {
+        "tags": ["系统管理"],
+        "summary": "删除用户（逻辑删除）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/roles": {
+      "get": {
+        "tags": ["系统管理"],
+        "summary": "角色列表",
+        "responses": { "200": { "description": "角色列表" } }
+      }
+    },
+    "/menus": {
+      "get": {
+        "tags": ["系统管理"],
+        "summary": "菜单树",
+        "responses": { "200": { "description": "菜单树" } }
+      }
+    },
+    "/roles/{id}/menus": {
+      "put": {
+        "tags": ["系统管理"],
+        "summary": "给角色分配菜单（重设其菜单集合）",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["menuIds"],
+                "properties": {
+                  "menuIds": { "type": "array", "items": { "type": "integer" }, "example": [100, 200, 201, 202] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "成功" } }
+      }
+    },
+    "/logs": {
+      "get": {
+        "tags": ["系统管理"],
+        "summary": "操作日志分页",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "username", "in": "query", "schema": { "type": "string" } },
+          { "name": "startDate", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "endDate", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "分页结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PageResult" } } } } }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+# 工具与 IDE 配置文件
+.workbuddy/
+.claude/
+.idea/
+*.iml
+.vscode/
+
+# 前端依赖与构建产物
+coal-web/node_modules/
+coal-web/dist/
+coal-web/dist-ssr/
+
+# 后端构建产物
+coal-sales/target/
+coal-sales/.mvn/wrapper/maven-wrapper.jar
+
+# 日志
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 根目录下的前端依赖（可能是误操作生成的）
+node_modules/
+package-lock.json
+package.json

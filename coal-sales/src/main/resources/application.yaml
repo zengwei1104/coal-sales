@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: coal-sales
+
+  # 数据库连接
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/coal_sales?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+# MyBatis-Plus 配置
+mybatis-plus:
+  # 实体类位置（后面写实体类用）
+  type-aliases-package: com.nczy.coalsales.entity
+  # XML 映射文件位置（现在还没有，先留着）
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    # 驼峰转下划线：实体类 customerName -> 数据库列 customer_name
+    map-underscore-to-camel-case: true
+    # 打印 SQL 日志（开发时看 SQL 方便，答辩后可以关）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      # 主键策略：自增
+      id-type: auto
+      # 逻辑删除字段（对应表的 deleted 字段）
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 服务器端口
+server:
+  port: 8080
