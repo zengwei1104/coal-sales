@@ -92,6 +92,14 @@ const router = createRouter({
   routes
 })
 
+// 各角色默认首页（非 ADMIN/MANAGER 不允许进工作台，登录后落到各自模块）
+const roleDefaultPath = {
+  SALES: '/biz/customer',
+  WEIGHMAN: '/weigh/ticket',
+  STOCK: '/stock/query',
+  FINANCE: '/finance/settle'
+}
+
 // 登录守卫：未登录跳转登录页
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
@@ -99,6 +107,15 @@ router.beforeEach((to, from, next) => {
     next()
   } else if (!token) {
     next('/login')
+  } else if (to.path === '/dashboard') {
+    // 工作台仅对管理员、销售经理开放
+    const roleCode = JSON.parse(localStorage.getItem('userInfo') || '{}').roleCode
+    if (roleCode === 'ADMIN' || roleCode === 'MANAGER') {
+      next()
+    } else {
+      // 其余角色跳转到各自默认页面
+      next(roleDefaultPath[roleCode] || '/login')
+    }
   } else {
     next()
   }

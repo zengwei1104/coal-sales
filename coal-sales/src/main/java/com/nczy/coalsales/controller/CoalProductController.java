@@ -26,7 +26,7 @@ public class CoalProductController {
     public Result<PageResult<CoalProduct>> page(@RequestParam(defaultValue = "1") Long current,
                                                 @RequestParam(defaultValue = "10") Long size,
                                                 @AuthenticationPrincipal LoginUser loginUser){
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN,RoleConstant.STOCK);
         return Result.success(coalProductService.pageCoalProduct(current,size));
     }
 

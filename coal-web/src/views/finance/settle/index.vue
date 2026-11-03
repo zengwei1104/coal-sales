@@ -35,7 +35,7 @@ const loadData = async () => {
 }
 
 const loadOptions = async () => {
-  const c = await getContractPage({ current: 1, size: 100, status: 2 })
+  const c = await getContractPage({ current: 1, size: 100})
   contractOptions.value = c.data.records
 }
 

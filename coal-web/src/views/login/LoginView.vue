@@ -30,7 +30,15 @@ const handleLogin = () => {
       const res = await login(form.value)
       userStore.setLoginInfo(res.data)
       ElMessage.success('登录成功')
-      router.push('/')
+      // 按角色落地：管理员/销售经理进工作台，其余角色进各自默认模块
+      const roleCode = res.data.userInfo?.roleCode
+      const roleDefaultPath = {
+        SALES: '/biz/customer',
+        WEIGHMAN: '/weigh/ticket',
+        STOCK: '/stock/query',
+        FINANCE: '/finance/settle'
+      }
+      router.push(roleDefaultPath[roleCode] || '/dashboard')
     } finally {
       loading.value = false
     }
