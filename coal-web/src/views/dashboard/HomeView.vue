@@ -157,9 +157,9 @@ onMounted(loadData)
 
     <!-- 统计卡片 -->
     <div class="stat-grid">
-      <el-card shadow="hover" class="stat-card" @click="goTo('/biz/customer')">
+      <el-card shadow="never" class="stat-card" @click="goTo('/biz/customer')">
         <div class="stat-inner">
-          <div class="stat-icon" style="background:#e8f1ff;color:#409eff"><el-icon><User /></el-icon></div>
+          <div class="stat-icon"><el-icon><User /></el-icon></div>
           <div>
             <div class="stat-num">{{ stats.customer }}</div>
             <div class="stat-label">客户总数</div>
@@ -167,9 +167,9 @@ onMounted(loadData)
         </div>
       </el-card>
 
-      <el-card shadow="hover" class="stat-card" @click="goTo('/biz/contract')">
+      <el-card shadow="never" class="stat-card" @click="goTo('/biz/contract')">
         <div class="stat-inner">
-          <div class="stat-icon" style="background:#e6f7ee;color:#67c23a"><el-icon><Document /></el-icon></div>
+          <div class="stat-icon"><el-icon><Document /></el-icon></div>
           <div>
             <div class="stat-num">{{ stats.contract }}</div>
             <div class="stat-label">合同总数</div>
@@ -177,9 +177,9 @@ onMounted(loadData)
         </div>
       </el-card>
 
-      <el-card shadow="hover" class="stat-card" @click="goTo('/weigh/ticket')">
+      <el-card shadow="never" class="stat-card" @click="goTo('/weigh/ticket')">
         <div class="stat-inner">
-          <div class="stat-icon" style="background:#fdf3e6;color:#e6a23c"><el-icon><Tickets /></el-icon></div>
+          <div class="stat-icon"><el-icon><Tickets /></el-icon></div>
           <div>
             <div class="stat-num">{{ stats.weigh }}</div>
             <div class="stat-label">磅单总数</div>
@@ -187,9 +187,9 @@ onMounted(loadData)
         </div>
       </el-card>
 
-      <el-card shadow="hover" class="stat-card" @click="goTo('/finance/settle')">
+      <el-card shadow="never" class="stat-card" @click="goTo('/finance/settle')">
         <div class="stat-inner">
-          <div class="stat-icon" style="background:#fdecec;color:#f56c6c"><el-icon><Box /></el-icon></div>
+          <div class="stat-icon"><el-icon><Box /></el-icon></div>
           <div>
             <div class="stat-num">{{ stats.settle }}</div>
             <div class="stat-label">结算单数</div>
@@ -299,13 +299,13 @@ onMounted(loadData)
 }
 .welcome-title {
   font-size: 22px;
-  font-weight: 600;
-  color: #1f2d3d;
+  font-weight: 700;
+  color: var(--ink-950);
 }
 .welcome-sub {
   margin-top: 6px;
   font-size: 14px;
-  color: #909399;
+  color: var(--ink-600);
 }
 
 .stat-grid {
@@ -316,6 +316,11 @@ onMounted(loadData)
 }
 .stat-card {
   cursor: pointer;
+  border: 1px solid var(--ink-200);
+  transition: border-color 0.2s ease;
+}
+.stat-card:hover {
+  border-color: var(--color-amber);
 }
 .stat-inner {
   display: flex;
@@ -325,34 +330,38 @@ onMounted(loadData)
 .stat-icon {
   width: 52px;
   height: 52px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   flex-shrink: 0;
+  background: var(--color-amber-tint);
+  color: var(--color-amber-strong);
 }
 .stat-num {
   font-size: 26px;
   font-weight: 700;
   line-height: 1.1;
-  color: #1f2d3d;
+  color: var(--ink-950);
+  font-variant-numeric: tabular-nums;
 }
 .stat-label {
   margin-top: 4px;
   font-size: 13px;
-  color: #909399;
+  color: var(--ink-600);
 }
 
 .section-card {
   margin-bottom: 16px;
+  border: 1px solid var(--ink-200);
 }
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
-  color: #1f2d3d;
+  color: var(--ink-950);
 }
 .section-header .el-icon {
   vertical-align: -2px;
@@ -370,16 +379,17 @@ onMounted(loadData)
   font-size: 30px;
   font-weight: 700;
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
-.status-num.warn { color: #e6a23c; }
-.status-num.primary { color: #409eff; }
-.status-num.success { color: #67c23a; }
-.status-num.info { color: #909399; }
-.status-num.total { color: #1f2d3d; }
+.status-num.warn { color: var(--warning); }
+.status-num.primary { color: var(--color-amber-strong); }
+.status-num.success { color: var(--success); }
+.status-num.info { color: var(--ink-500); }
+.status-num.total { color: var(--ink-950); }
 .status-label {
   margin-top: 6px;
   font-size: 13px;
-  color: #909399;
+  color: var(--ink-600);
 }
 
 .two-col {

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>煤炭销售管理系统 · Linux 部署文档</title>
+<style>
+  :root {
+    --primary: #1f6feb;
+    --bg: #f6f8fa;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --border: #d0d7de;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #24292f;
+    line-height: 1.7;
+    background: var(--bg);
+  }
+  .container { display: flex; max-width: 1200px; margin: 0 auto; }
+  nav {
+    width: 240px; min-width: 240px; padding: 24px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: #fff; border-right: 1px solid var(--border);
+  }
+  nav h3 { font-size: 14px; color: #57606a; margin: 0 0 12px; }
+  nav a {
+    display: block; padding: 6px 12px; margin-bottom: 4px;
+    color: #24292f; text-decoration: none; font-size: 14px;
+    border-radius: 6px;
+  }
+  nav a:hover { background: #f0f6ff; color: var(--primary); }
+  main { flex: 1; padding: 32px 40px; }
+  h1 { font-size: 28px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+  h2 { font-size: 22px; margin-top: 40px; color: #1f2328; border-left: 4px solid var(--primary); padding-left: 12px; }
+  h3 { font-size: 17px; margin-top: 28px; }
+  blockquote {
+    margin: 16px 0; padding: 8px 16px; background: #fff8c5;
+    border-left: 4px solid #d4a72c; border-radius: 4px; font-size: 14px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 16px; border-radius: 8px; overflow-x: auto;
+    font-size: 13.5px; line-height: 1.6;
+  }
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  p code, li code { background: #eef1f4; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  table { border-collapse: collapse; margin: 16px 0; width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; font-size: 14px; }
+  th { background: #f6f8fa; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 8px; }
+  .tag.warn { background: #fff1f0; color: #cf222e; }
+  .tag.info { background: #ddf4ff; color: #0969da; }
+  .tag.ok { background: #dafbe1; color: #1a7f37; }
+  .step { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <h3>📋 目录导航</h3>
+    <a href="#arch">一、架构与目录约定</a>
+    <a href="#env">二、环境准备</a>
+    <a href="#db">三、拉代码 + 初始化数据库</a>
+    <a href="#scripts">四、部署脚本</a>
+    <a href="#steps">五、执行步骤</a>
+    <a href="#update">六、日常更新流程</a>
+    <a href="#note">七、注意事项</a>
+  </nav>
+
+  <main>
+    <h1>煤炭销售管理系统 · Linux 部署文档</h1>
+    <p>
+      <span class="tag info">适用系统：RHEL / CentOS / Rocky / Fedora（dnf/yum）</span>
+      <span class="tag info">JDK 21</span>
+      <span class="tag info">Spring Boot 3.5.16</span>
+      <span class="tag info">MySQL 8.0</span>
+      <span class="tag info">Vue 3 + Vite</span>
+    </p>
+
+    <h2 id="arch">一、架构与目录约定</h2>
+    <pre>
+浏览器 → Nginx(80) → 前端静态资源(/var/www/coal-web)
+                    → /api 反代 → Spring Boot(8080) → MySQL(coal_sales)</pre>
+    <pre>
+/opt/coal-sales/           # 项目根（git clone）
+├── coal-sales/            # 后端
+├── coal-web/              # 前端
+├── sql/                   # 数据库脚本
+├── deploy.sh              # 首次部署脚本
+├── update.sh              # 日常更新脚本
+└── nginx/coal-sales.conf  # Nginx 配置</pre>
+
+    <h2 id="env">二、环境准备（一次性）</h2>
+    <div class="step">
+      <h3>1. 基础工具</h3>
+      <pre><code>sudo dnf install -y git maven nginx</code></pre>
+      <h3>2. Node 20</h3>
+      <pre><code>curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo dnf install -y nodejs</code></pre>
+      <h3>3. MySQL</h3>
+      <pre><code>sudo dnf install -y mysql-server
+sudo systemctl enable --now mysqld</code></pre>
+      <h3>4. 修改 MySQL root 密码</h3>
+      <pre><code>sudo grep 'temporary password' /var/log/mysqld.log   # 查看临时密码
+mysql -u root -p
+# 登录后执行：ALTER USER 'root'@'localhost' IDENTIFIED BY '你的新密码';</code></pre>
+      <h3>5. 验证</h3>
+      <pre><code>java -version && mvn -v && node -v && nginx -v && mysql --version</code></pre>
+    </div>
+
+    <h2 id="db">三、拉代码 + 初始化数据库</h2>
+    <pre><code>cd /opt
+git clone https://github.com/你的用户名/coal-sales.git
+cd coal-sales
+
+# 建库 + 建应用账号
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS coal_sales DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; CREATE USER 'coal'@'localhost' IDENTIFIED BY 'Coal@123456'; GRANT ALL ON coal_sales.* TO 'coal'@'localhost'; FLUSH PRIVILEGES;"
+
+# 按依赖顺序导入 SQL
+cd sql
+for f in 01-permission 02-base-data 03-sales 04-stock 05-finance 06-audit 07-dashboard-permission-fix; do
+  mysql -u root -p coal_sales &lt; $f.sql
+done</code></pre>
+
+    <h2 id="scripts">四、部署脚本</h2>
+
+    <h3>4.1 deploy.sh（首次部署）</h3>
+    <pre><code>#!/usr/bin/env bash
+set -euo pipefail
+
+DB_USER="coal"
+DB_PASS="Coal@123456"
+APP_HOME="/opt/coal-sales"
+WEB_DIR="/var/www/coal-web"
+JAR_NAME="coal-sales-0.0.1-SNAPSHOT.jar"
+
+echo "==&gt; 1/4 构建后端"
+cd "$APP_HOME/coal-sales"
+DB_USERNAME=$DB_USER DB_PASSWORD=$DB_PASS mvn clean package -DskipTests
+
+echo "==&gt; 2/4 构建前端"
+cd "$APP_HOME/coal-web"
+npm install
+npm run build
+
+echo "==&gt; 3/4 部署前端静态文件"
+sudo mkdir -p "$WEB_DIR"
+sudo rm -rf "$WEB_DIR"/*
+sudo cp -r dist/* "$WEB_DIR"/
+
+echo "==&gt; 4/4 启动后端"
+pkill -f "$JAR_NAME" 2&gt;/dev/null || true
+cd "$APP_HOME/coal-sales"
+nohup env DB_USERNAME=$DB_USER DB_PASSWORD=$DB_PASS \
+  java -jar target/$JAR_NAME &gt; "$APP_HOME/app.log" 2&gt;&amp;1 &amp;
+echo "后端 PID: $!"
+
+echo "✅ 部署完成"</code></pre>
+
+    <h3>4.2 update.sh（日常更新）</h3>
+    <pre><code>#!/usr/bin/env bash
+set -euo pipefail
+
+DB_USER="coal"
+DB_PASS="Coal@123456"
+APP_HOME="/opt/coal-sales"
+WEB_DIR="/var/www/coal-web"
+JAR_NAME="coal-sales-0.0.1-SNAPSHOT.jar"
+
+cd "$APP_HOME"
+echo "==&gt; 拉取最新代码"
+git pull
+
+if git diff --name-only HEAD@{1} HEAD | grep -q '^coal-sales/'; then
+  echo "==&gt; 后端有改动，重新打包并重启"
+  cd coal-sales
+  DB_USERNAME=$DB_USER DB_PASSWORD=$DB_PASS mvn clean package -DskipTests
+  pkill -f "$JAR_NAME" 2&gt;/dev/null || true
+  nohup env DB_USERNAME=$DB_USER DB_PASSWORD=$DB_PASS \
+    java -jar target/$JAR_NAME &gt; "$APP_HOME/app.log" 2&gt;&amp;1 &amp;
+fi
+
+if git diff --name-only HEAD@{1} HEAD | grep -q '^coal-web/'; then
+  echo "==&gt; 前端有改动，重新构建"
+  cd "$APP_HOME/coal-web"
+  npm run build
+  sudo rm -rf "$WEB_DIR"/*
+  sudo cp -r dist/* "$WEB_DIR"/
+fi
+
+echo "✅ 更新完成"</code></pre>
+
+    <h3>4.3 nginx/coal-sales.conf</h3>
+    <pre><code>server {
+    listen 80;
+    server_name _;
+
+    root /var/www/coal-web;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}</code></pre>
+
+    <h3>4.4 systemd 服务（推荐，替代 nohup）</h3>
+    <p>文件：<code>/etc/systemd/system/coal-sales.service</code></p>
+    <pre><code>[Unit]
+Description=Coal Sales Backend
+After=network.target mysqld.service
+
+[Service]
+User=zengwei
+Environment=DB_USERNAME=coal
+Environment=DB_PASSWORD=Coal@123456
+ExecStart=/usr/bin/java -jar /opt/coal-sales/coal-sales/target/coal-sales-0.0.1-SNAPSHOT.jar
+WorkingDirectory=/opt/coal-sales/coal-sales
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+    <pre><code>sudo systemctl daemon-reload
+sudo systemctl enable --now coal-sales
+sudo systemctl status coal-sales</code></pre>
+
+    <h2 id="steps">五、执行步骤</h2>
+    <pre><code># 1. 给脚本加权限
+cd /opt/coal-sales
+chmod +x deploy.sh update.sh
+
+# 2. 首次部署
+./deploy.sh
+
+# 3. 配置 Nginx
+sudo cp nginx/coal-sales.conf /etc/nginx/conf.d/
+sudo nginx -t &amp;&amp; sudo systemctl reload nginx
+
+# 4. 开放防火墙（若启用 firewalld）
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --reload
+
+# 5. 浏览器访问验证
+# http://服务器IP</code></pre>
+
+    <h2 id="update">六、日常更新流程</h2>
+    <pre><code># 本地 Windows：
+git add . &amp;&amp; git commit -m "本次改动" &amp;&amp; git push
+
+# 服务器：
+cd /opt/coal-sales
+./update.sh</code></pre>
+
+    <h2 id="note">七、注意事项</h2>
+    <table>
+      <tr><th>#</th><th>事项</th><th>说明</th></tr>
+      <tr><td>1</td><td>数据库密码</td><td><code>Coal@123456</code> 需改成实际密码，且不要提交进 git</td></tr>
+      <tr><td>2</td><td>前端依赖</td><td><code>coal-web/</code> 需先有 <code>package.json</code> 才能 <code>npm install</code></td></tr>
+      <tr><td>3</td><td>进程管理</td><td>nohup 适合快速验证，生产建议用 systemd</td></tr>
+      <tr><td>4</td><td>数据库变更</td><td>写增量 SQL 单独执行，勿重跑全量脚本覆盖数据</td></tr>
+      <tr><td>5</td><td>备份</td><td>更新前先 <code>mysqldump -u coal -p coal_sales &gt; backup_$(date +%F).sql</code></td></tr>
+    </table>
+  </main>
+</div>
+</body>
+</html>

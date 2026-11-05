@@ -104,6 +104,15 @@ const username = computed(() => {
 // 当前选中的菜单（高亮用）
 const activeMenu = computed(() => route.path)
 
+// 顶栏标题：从菜单树中匹配当前路径
+const activeTitle = computed(() => {
+  for (const group of menuTree) {
+    const hit = group.children.find(i => i.path === route.path)
+    if (hit) return hit.title
+  }
+  return '煤炭销售管理系统'
+})
+
 // 退出登录
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
@@ -118,14 +127,22 @@ const handleLogout = () => {
 <template>
   <el-container class="layout">
     <!-- 侧边栏 -->
-    <el-aside width="220px" class="aside">
-      <div class="logo">煤炭销售管理系统</div>
+    <el-aside width="232px" class="aside">
+      <div class="logo">
+        <span class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+            <path d="M6 17l3-4 2.5 2.5L15 8l3 6" stroke="currentColor"
+              stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="logo-text">煤炭销售</span>
+      </div>
       <el-menu
         :default-active="activeMenu"
         router
-        background-color="#001529"
-        text-color="#a6adb4"
-        active-text-color="#ffffff"
+        background-color="transparent"
+        text-color="#9aa2ad"
+        active-text-color="#f5b942"
         class="menu"
       >
         <template v-for="group in visibleMenuTree" :key="group.title">
@@ -149,7 +166,7 @@ const handleLogout = () => {
     <el-container>
       <!-- 顶栏 -->
       <el-header class="header">
-        <div class="header-title">煤炭销售管理系统</div>
+        <div class="header-title">{{ activeTitle }}</div>
         <div class="header-right">
           <span class="username">{{ username }}</span>
           <el-button link type="primary" @click="handleLogout">退出</el-button>
@@ -169,32 +186,62 @@ const handleLogout = () => {
   height: 100vh;
 }
 .aside {
-  background-color: #001529;
+  background-color: var(--ink-950);
   overflow-x: hidden;
+  border-right: 1px solid oklch(28% 0.008 60);
 }
 .logo {
   height: 60px;
-  line-height: 60px;
-  text-align: center;
-  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid oklch(28% 0.008 60);
+  color: var(--ink-50);
   font-size: 16px;
-  font-weight: bold;
-  background-color: #002140;
+  font-weight: 700;
   white-space: nowrap;
+}
+.logo-mark {
+  color: var(--color-amber);
+  display: flex;
+  align-items: center;
+}
+.logo-text {
+  letter-spacing: 0.04em;
 }
 .menu {
   border-right: none;
+  padding: var(--space-2) var(--space-3);
+}
+/* 菜单项：工业风，选中态用琥珀金左侧竖条 */
+.menu :deep(.el-menu-item),
+.menu :deep(.el-sub-menu__title) {
+  height: 44px;
+  line-height: 44px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 2px;
+}
+.menu :deep(.el-menu-item:hover),
+.menu :deep(.el-sub-menu__title:hover) {
+  background-color: oklch(28% 0.008 60);
+}
+.menu :deep(.el-menu-item.is-active) {
+  background-color: oklch(72% 0.16 75 / 0.12);
+  color: var(--color-amber);
+  font-weight: 600;
 }
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #fff;
-  border-bottom: 1px solid #e8e8e8;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--ink-200);
 }
 .header-title {
   font-size: 16px;
   font-weight: 600;
+  color: var(--ink-900);
 }
 .header-right {
   display: flex;
@@ -202,10 +249,10 @@ const handleLogout = () => {
   gap: 12px;
 }
 .username {
-  color: #333;
+  color: var(--ink-700);
 }
 .main {
-  background-color: #f5f7fa;
+  background-color: var(--color-bg);
   padding: 16px;
 }
 </style>

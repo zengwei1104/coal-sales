@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>煤炭销售管理系统 · Docker 部署文档</title>
+<style>
+  :root {
+    --primary: #1f6feb;
+    --bg: #f6f8fa;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --border: #d0d7de;
+    --accent: #0969da;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #24292f;
+    line-height: 1.7;
+    background: var(--bg);
+  }
+  .container { display: flex; max-width: 1200px; margin: 0 auto; }
+  nav {
+    width: 250px; min-width: 250px; padding: 24px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: #fff; border-right: 1px solid var(--border);
+  }
+  nav h3 { font-size: 14px; color: #57606a; margin: 0 0 12px; }
+  nav a {
+    display: block; padding: 6px 12px; margin-bottom: 4px;
+    color: #24292f; text-decoration: none; font-size: 14px;
+    border-radius: 6px;
+  }
+  nav a:hover { background: #f0f6ff; color: var(--primary); }
+  main { flex: 1; padding: 32px 40px; }
+  h1 { font-size: 28px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+  h2 { font-size: 22px; margin-top: 40px; color: #1f2328; border-left: 4px solid var(--primary); padding-left: 12px; }
+  h3 { font-size: 17px; margin-top: 28px; }
+  blockquote {
+    margin: 16px 0; padding: 8px 16px; background: #fff8c5;
+    border-left: 4px solid #d4a72c; border-radius: 4px; font-size: 14px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 16px; border-radius: 8px; overflow-x: auto;
+    font-size: 13.5px; line-height: 1.6;
+  }
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  p code, li code { background: #eef1f4; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  table { border-collapse: collapse; margin: 16px 0; width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; font-size: 14px; }
+  th { background: #f6f8fa; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 8px; }
+  .tag.warn { background: #fff1f0; color: #cf222e; }
+  .tag.info { background: #ddf4ff; color: #0969da; }
+  .tag.ok { background: #dafbe1; color: #1a7f37; }
+  .step { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .arch {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; margin: 16px 0; text-align: center;
+  }
+  .arch-box {
+    display: inline-block; border: 2px solid var(--primary); border-radius: 8px;
+    padding: 10px 18px; margin: 6px; font-size: 14px; background: #f0f6ff;
+  }
+  .arch-box.mysql { border-color: #1a7f37; background: #dafbe1; }
+  .arch-box.web { border-color: #d4a72c; background: #fff8c5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <h3>🐳 目录导航</h3>
+    <a href="#why">一、为什么用 Docker</a>
+    <a href="#arch">二、容器化架构</a>
+    <a href="#files">三、需要准备的文件</a>
+    <a href="#backend">　· 后端 Dockerfile</a>
+    <a href="#frontend">　· 前端 Dockerfile</a>
+    <a href="#compose">　· docker-compose.yml</a>
+    <a href="#install">四、虚拟机安装 Docker</a>
+    <a href="#deploy">五、一键部署流程</a>
+    <a href="#verify">六、验证与访问</a>
+    <a href="#note">七、注意事项</a>
+  </nav>
+
+  <main>
+    <h1>煤炭销售管理系统 · Docker 部署文档</h1>
+    <p>
+      <span class="tag info">Docker + Compose</span>
+      <span class="tag info">MySQL 8.0</span>
+      <span class="tag info">JDK 21</span>
+      <span class="tag info">Spring Boot 3.5.16</span>
+      <span class="tag info">Nginx</span>
+    </p>
+
+    <h2 id="why">一、为什么用 Docker</h2>
+    <table>
+      <tr><th>维度</th><th>传统部署</th><th>Docker 部署</th></tr>
+      <tr><td>环境安装</td><td>手动装 JDK/Maven/Node/MySQL/Nginx 共 5 项</td><td>只装 Docker 1 项</td></tr>
+      <tr><td>版本冲突</td><td>容易遇到（Maven、Node 版本对不上）</td><td>镜像内锁定版本，无冲突</td></tr>
+      <tr><td>部署命令</td><td>多步（装环境→导库→build→启动）</td><td><code>docker compose up -d</code> 一步</td></tr>
+      <tr><td>迁移/重装</td><td>换机器要重来一遍</td><td>装 Docker 后 pull 镜像即可</td></tr>
+      <tr><td>数据库初始化</td><td>手动逐条导入 SQL</td><td>首次启动自动建库 + 导入 SQL</td></tr>
+    </table>
+
+    <h2 id="arch">二、容器化架构</h2>
+    <div class="arch">
+      <div style="font-size:15px; margin-bottom:14px; color:#57606a;">Docker 容器内部网络</div>
+      <div class="arch-box web">web 容器<br>Nginx :80</div>
+      <div style="font-size:13px; color:#57606a; margin:4px;">└─ /api 反代 ↓</div>
+      <div class="arch-box">backend 容器<br>JDK21 + jar :8080</div>
+      <div style="font-size:13px; color:#57606a; margin:4px;">└─ ↓</div>
+      <div class="arch-box mysql">mysql 容器<br>MySQL 8.0 :3306</div>
+      <div style="font-size:13px; color:#57606a; margin-top:12px;">▲ 宿主机只对外暴露 80 端口</div>
+    </div>
+    <p>三个容器通过 Docker 内部网络互通（用服务名 <code>backend</code>、<code>mysql</code> 当主机名），宿主机只对外暴露 80 端口。</p>
+
+    <h2 id="files">三、需要准备的文件</h2>
+    <p>给项目添加 3 个文件即可，目录结构：</p>
+    <pre>
+项目根目录/
+├── docker-compose.yml           # 编排三个服务
+├── coal-sales/Dockerfile        # 后端镜像
+└── coal-web/Dockerfile          # 前端镜像
+    └── coal-web/nginx.conf      # 前端 Nginx 配置</pre>
+
+    <h3 id="backend">3.1 coal-sales/Dockerfile（后端）</h3>
+    <pre><code># 构建阶段：用 Maven + JDK21 打包
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# 运行阶段：只保留 JRE + jar，镜像更小
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/target/coal-sales-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+
+    <h3 id="frontend">3.2 coal-web/Dockerfile（前端）</h3>
+    <pre><code># 构建阶段
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# 运行阶段：Nginx 托管
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80</code></pre>
+    <p>配套 <code>coal-web/nginx.conf</code>：</p>
+    <pre><code>server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://backend:8080;   # 用服务名 backend
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}</code></pre>
+
+    <h3 id="compose">3.3 docker-compose.yml（根目录）</h3>
+    <pre><code>services:
+  mysql:
+    image: mysql:8.0
+    container_name: coal-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 改成你的root密码
+      MYSQL_DATABASE: coal_sales
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    ports:
+      - "3306:3306"          # 可选，本地工具连库用；生产可去掉
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d   # 首次启动自动执行所有 .sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  backend:
+    build: ./coal-sales
+    container_name: coal-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: root
+      DB_PASSWORD: 改成你的root密码
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/coal_sales?useUnicode=true&amp;characterEncoding=utf8&amp;serverTimezone=Asia/Shanghai&amp;useSSL=false&amp;allowPublicKeyRetrieval=true
+    ports:
+      - "8080:8080"          # 可选，调试用
+    restart: unless-stopped
+
+  web:
+    build: ./coal-web
+    container_name: coal-web
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:</code></pre>
+
+    <h2 id="install">四、虚拟机安装 Docker</h2>
+    <div class="step">
+      <p>虚拟机（RHEL/CentOS 系）里只需装 Docker 一个东西：</p>
+      <pre><code># 安装 Docker 及 Compose 插件
+sudo dnf install -y docker docker-compose-plugin
+
+# 启动并设开机自启
+sudo systemctl enable --now docker
+
+# 验证
+docker --version
+docker compose version</code></pre>
+      <blockquote>如果 <code>docker-compose-plugin</code> 找不到，可改用 <code>sudo dnf install -y docker-compose</code>（旧版命令为 <code>docker-compose</code>，新版为 <code>docker compose</code>）。</blockquote>
+    </div>
+
+    <h2 id="deploy">五、一键部署流程</h2>
+    <pre><code># 1. 把项目代码弄进虚拟机
+git clone https://github.com/你的用户名/coal-sales.git
+cd coal-sales
+
+# 2. 一条命令起全套（首次自动 build 镜像 + 建库 + 导数据）
+docker compose up -d --build
+
+# 3. 查看状态
+docker compose ps
+docker compose logs -f backend    # 看后端日志</code></pre>
+
+    <h2 id="verify">六、验证与访问</h2>
+    <div class="step">
+      <h3>1. 查虚拟机 IP</h3>
+      <pre><code>ip addr
+# 或
+hostname -I</code></pre>
+      <p>输出中形如 <code>192.168.x.x</code> 的即虚拟机 IP。</p>
+      <h3>2. 浏览器访问</h3>
+      <pre><code>http://虚拟机IP            # 系统前端页面
+http://虚拟机IP/api/...    # 接口（经 Nginx 转发）</code></pre>
+      <h3>3. 网络模式要求</h3>
+      <table>
+        <tr><th>网络模式</th><th>能否从 Windows 访问</th><th>说明</th></tr>
+        <tr><td>桥接 Bridged</td><td>✅ 能</td><td>虚拟机与宿主机同网段，推荐</td></tr>
+        <tr><td>NAT</td><td>⚠️ 需配端口转发</td><td>要手动转发 80 端口</td></tr>
+        <tr><td>仅主机 Host-only</td><td>✅ 能</td><td>仅宿主机与虚拟机互通</td></tr>
+      </table>
+      <blockquote>若为云服务器，则用公网 IP，并在安全组放行 80 端口。</blockquote>
+    </div>
+
+    <h2 id="note">七、注意事项</h2>
+    <table>
+      <tr><th>#</th><th>事项</th><th>说明</th></tr>
+      <tr><td>1</td><td>SQL 脚本</td><td>容器首次启动会自动执行 <code>sql/</code> 下所有脚本（01~07 按文件名顺序），但 <code>init.sql</code> 里的 <code>SOURCE</code> 命令在容器内不适用，建议只挂载 01~07，跳过 init.sql</td></tr>
+      <tr><td>2</td><td>数据库账号</td><td>容器默认建 root（用 <code>MYSQL_ROOT_PASSWORD</code>），后端 <code>DB_USERNAME=root</code>；如需独立账号，加一个初始化脚本专门建用户</td></tr>
+      <tr><td>3</td><td>密码</td><td>compose 里的 <code>MYSQL_ROOT_PASSWORD</code> 和 <code>DB_PASSWORD</code> 要一致，且不要提交进 git</td></tr>
+      <tr><td>4</td><td>端口暴露</td><td>3306/8080 暴露给宿主机仅供调试；生产建议只暴露 80</td></tr>
+      <tr><td>5</td><td>数据持久化</td><td>mysql 数据存在 <code>mysql-data</code> 卷里，容器重启不丢数据</td></tr>
+      <tr><td>6</td><td>更新代码</td><td>改代码后 <code>docker compose up -d --build</code> 重新构建对应镜像即可</td></tr>
+    </table>
+  </main>
+</div>
+</body>
+</html>
