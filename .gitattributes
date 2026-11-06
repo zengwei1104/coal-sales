@@ -1,0 +1,7 @@
+# 强制部署关键文件使用 LF 换行符，避免 Windows CRLF 在 Linux 容器内引发问题
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf
+docker-compose.yml text eol=lf
+*.sql text eol=lf
+mvnw text eol=lf

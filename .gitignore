@@ -22,6 +22,6 @@ coal-sales/.mvn/wrapper/maven-wrapper.jar
 Thumbs.db
 
 # 根目录下的前端依赖（可能是误操作生成的）
-node_modules/
-package-lock.json
-package.json
+/node_modules/
+/package-lock.json
+/package.json

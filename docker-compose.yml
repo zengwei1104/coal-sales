@@ -1,0 +1,42 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: coal-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: coal_sales
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./coal-sales
+    container_name: coal-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_USERNAME: root
+      DB_PASSWORD: "123456"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/coal_sales?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    restart: unless-stopped
+
+  web:
+    build: ./coal-web
+    container_name: coal-web
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
