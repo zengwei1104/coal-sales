@@ -82,6 +82,37 @@ const routes = [
         component: () => import('../views/finance/payment/index.vue'),
         meta: { title: '回款管理' }
       },
+      // ---- 统计报表 ----
+      {
+        path: 'report/trend',
+        name: 'SalesTrend',
+        component: () => import('../views/report/trend/index.vue'),
+        meta: { title: '销售趋势' }
+      },
+      {
+        path: 'report/rank',
+        name: 'CoalRank',
+        component: () => import('../views/report/rank/index.vue'),
+        meta: { title: '煤种排行' }
+      },
+      {
+        path: 'report/customer',
+        name: 'CustomerRank',
+        component: () => import('../views/report/customer/index.vue'),
+        meta: { title: '客户排行' }
+      },
+      {
+        path: 'report/payment',
+        name: 'PaymentRate',
+        component: () => import('../views/report/payment/index.vue'),
+        meta: { title: '回款率统计' }
+      },
+      {
+        path: 'report/stock-warning',
+        name: 'StockWarning',
+        component: () => import('../views/report/stockWarning/index.vue'),
+        meta: { title: '库存预警' }
+      },
       // ---- 其他模块页面后续按同样方式逐个补充 ----
     ]
   }

@@ -1,6 +1,7 @@
 package com.nczy.coalsales.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.nczy.coalsales.dto.StockWarningDTO;
 import com.nczy.coalsales.entity.Stock;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -55,5 +56,20 @@ public interface StockMapper extends BaseMapper<Stock> {
             "ORDER BY p.id DESC")
     List<Stock> listStock();
 
+    /**
+     * 库存预警：返回当前库存低于安全库存的煤种。
+     * safe_stock = 0 的煤种不触发（0 < 0 为假）。
+     */
+    @Select("SELECT " +
+            "p.id AS productId, " +
+            "p.product_name AS productName, " +
+            "IFNULL(s.total_qty, 0) AS totalQty, " +
+            "p.safe_stock AS safeStock " +
+            "FROM coal_product p " +
+            "LEFT JOIN stock s ON s.product_id = p.id AND s.deleted = 0 " +
+            "WHERE p.deleted = 0 " +
+            "  AND IFNULL(s.total_qty, 0) < p.safe_stock " +
+            "ORDER BY (IFNULL(s.total_qty, 0) - p.safe_stock) ASC")
+    List<StockWarningDTO> selectStockWarning();
 
 }

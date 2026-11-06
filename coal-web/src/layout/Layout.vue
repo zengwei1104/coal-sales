@@ -68,7 +68,9 @@ const menuTree = [
     children: [
       { title: '销售趋势', path: '/report/trend' },
       { title: '煤种排行', path: '/report/rank' },
-      { title: '客户排行', path: '/report/customer' }
+      { title: '客户排行', path: '/report/customer' },
+      { title: '回款率统计', path: '/report/payment' },
+      { title: '库存预警', path: '/report/stock-warning' }
     ]
   },
   {

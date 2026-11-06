@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoginUser 与 Spring Security 学习笔记</title>
+<style>
+  :root {
+    --blue: #1A54BE;
+    --blue-light: #E6F1FB;
+    --blue-border: #B5D4F4;
+    --teal: #0F6E56;
+    --teal-light: #E1F5EE;
+    --amber: #854F0B;
+    --amber-light: #FAEEDA;
+    --red: #A32D2D;
+    --red-light: #FCEBEB;
+    --text: #1f2328;
+    --text-muted: #5f6b7a;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --border: #e5e8ec;
+    --code-bg: #f1f3f5;
+    --code-text: #c7254e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.hero {
+    background: linear-gradient(135deg, #1A54BE 0%, #2f6fd6 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 40px 36px;
+    margin-bottom: 28px;
+  }
+  header.hero h1 { margin: 0 0 10px; font-size: 28px; font-weight: 600; }
+  header.hero p { margin: 0; font-size: 15px; opacity: 0.92; }
+  .meta { margin-top: 16px; font-size: 13px; opacity: 0.8; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 28px;
+    margin-bottom: 28px;
+  }
+  .toc h2 { margin: 0 0 12px; font-size: 16px; color: var(--blue); }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { margin: 6px 0; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--blue); }
+  section.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+  h2.sec {
+    font-size: 22px;
+    margin: 0 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--blue-light);
+    color: var(--blue);
+  }
+  h3 { font-size: 17px; margin: 22px 0 10px; color: #234; }
+  p { margin: 10px 0; }
+  code {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13.5px;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 18px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  .tip, .warn, .note {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .tip { background: var(--teal-light); border-left: 4px solid var(--teal); }
+  .warn { background: var(--amber-light); border-left: 4px solid var(--amber); }
+  .note { background: var(--red-light); border-left: 4px solid var(--red); }
+  .tip strong, .warn strong, .note strong { display: block; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+  th { background: var(--blue-light); color: #0C447C; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .qa { border-left: 3px solid var(--blue-border); padding-left: 16px; margin: 20px 0; }
+  .qa .q { font-weight: 600; color: var(--blue); margin-bottom: 4px; }
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .tag.ok { background: var(--teal-light); color: var(--teal); }
+  .tag.no { background: var(--red-light); color: var(--red); }
+  .tag.pending { background: var(--amber-light); color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>LoginUser 与 Spring Security 学习笔记</h1>
+    <p>基于「煤炭销售管理系统」实际代码，逐层搞懂认证、授权、权限控制</p>
+    <div class="meta">项目：com.nczy.coalsales · 技术栈：Spring Boot + Spring Security + JWT · 整理日期：2026-11-06</div>
+  </header>
+
+  <div class="toc">
+    <h2>目录</h2>
+    <ol>
+      <li><a href="#s1">LoginUser 是什么？有什么作用</a></li>
+      <li><a href="#s2">LoginUser 替代了 SysUser 吗？</a></li>
+      <li><a href="#s3">身份认证时都用 LoginUser 吗？</a></li>
+      <li><a href="#s4">LoginUser 在项目中的 6 处实际用法</a></li>
+      <li><a href="#s5">为什么要用 LoginUser（为什么不能直接塞 SysUser）</a></li>
+      <li><a href="#s6">Spring Security 的职责与组成</a></li>
+      <li><a href="#s7">getAuthorities() 方法与泛型拆解</a></li>
+      <li><a href="#s8">细粒度权限（按钮级 RBAC）详解</a></li>
+      <li><a href="#s9">如何实现细粒度权限（完整方案）</a></li>
+      <li><a href="#s10">一图总结核心概念关系</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <section class="card" id="s1">
+    <h2 class="sec">1. LoginUser 是什么？有什么作用</h2>
+    <p><code>LoginUser</code> 是 Spring Security 认证体系里的「登录用户」封装类，作用是把业务实体 <code>SysUser</code> 包装成 Spring Security 能识别的 <code>UserDetails</code> 对象。</p>
+
+    <h3>它本质上是一个「适配器 / 翻译官」</h3>
+    <p>Spring Security 只认 <code>UserDetails</code> 接口，不认你的 <code>SysUser</code>。登录成功后框架需要标准格式来保存登录用户、判断密码、判断账号状态、判断权限。<code>LoginUser</code> 就是把 <code>SysUser</code> 「翻译」成 Security 的语言。</p>
+
+    <h3>关键方法一览</h3>
+    <table>
+      <tr><th>方法</th><th>作用</th></tr>
+      <tr><td><code>getUsername()</code></td><td>返回登录账号，框架靠它查用户</td></tr>
+      <tr><td><code>getPassword()</code></td><td>返回加密后的密码，框架拿它比对</td></tr>
+      <tr><td><code>getAuthorities()</code></td><td>返回权限列表（RBAC 权限控制用）</td></tr>
+      <tr><td><code>isEnabled()</code></td><td>判断账号是否启用（用 status == 1），为 false 则登录失败</td></tr>
+      <tr><td><code>getUserId()</code></td><td>自定义方法：拿当前登录用户 id（高频使用）</td></tr>
+      <tr><td><code>getRoleId()</code></td><td>自定义方法：拿角色 id（一对一）</td></tr>
+      <tr><td><code>getUser()</code></td><td>自定义方法：拿完整 SysUser 实体</td></tr>
+    </table>
+
+    <h3>它不只是「登录凭证」</h3>
+    <p>它是当前登录用户在整个后端系统里的「上下文载体」——认证、授权、审计、会话、业务取数，都靠它。</p>
+    <table>
+      <tr><th>场景</th><th>作用</th></tr>
+      <tr><td>身份认证</td><td>Security 校验密码、判断账号状态</td></tr>
+      <tr><td>拿当前用户</td><td><code>getUserId()</code> 高频使用</td></tr>
+      <tr><td>权限控制</td><td><code>getAuthorities()</code> 配合 @PreAuthorize 做 RBAC</td></tr>
+      <tr><td>审计填充</td><td>MyBatis-Plus 自动填创建人/修改人</td></tr>
+      <tr><td>会话管理</td><td>序列化存 Redis，做 token 续期、踢人下线</td></tr>
+      <tr><td>业务扩展</td><td>塞部门、姓名等附加信息，减少查库</td></tr>
+    </table>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section class="card" id="s2">
+    <h2 class="sec">2. LoginUser 替代了 SysUser 吗？</h2>
+    <p class="note"><strong>结论：不是替代，是「包装」。</strong></p>
+
+    <table>
+      <tr><th>对比</th><th>SysUser（实体类）</th><th>LoginUser（包装类）</th></tr>
+      <tr><td>是什么</td><td>数据库表的映射</td><td>登录态的封装</td></tr>
+      <tr><td>对应数据</td><td>sys_user 表一行数据</td><td>当前「登录中」的一个用户</td></tr>
+      <tr><td>生命周期</td><td>存在数据库里，长期</td><td>存在内存/Redis，随登录会话存在</td></tr>
+      <tr><td>用途</td><td>增删改查、存数据</td><td>认证、授权、拿当前登录人</td></tr>
+      <tr><td>谁用</td><td>Service / Mapper</td><td>Security 框架、Controller</td></tr>
+    </table>
+
+    <p>从代码看更清楚，<code>LoginUser</code> 内部「持有」一个 <code>SysUser</code>：</p>
+    <pre><code>public class LoginUser implements UserDetails {
+    private final SysUser user;   // ← 它把 SysUser 包在里面
+}</code></pre>
+
+    <div class="tip">
+      <strong>打个比方</strong>
+      SysUser 是你这个人本身；LoginUser 是你在公司门口刷的「工牌」——工牌上有你的信息，但它不是「你」，只是代表「你」能进门的凭证。
+    </div>
+
+    <p>在 Controller 层拿当前用户时，确实不再直接操作 SysUser，而是通过 LoginUser，但那只说明「读取当前登录人」这个场景用 LoginUser 更顺手，<strong>不代表 SysUser 被替代了</strong>。数据库那边，SysUser 还是唯一的主。</p>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section class="card" id="s3">
+    <h2 class="sec">3. 身份认证时都用 LoginUser 吗？</h2>
+    <p>基本正确。身份认证的整个流程里，核心角色就是 LoginUser。完整流程：</p>
+
+    <pre><code>用户输入账号密码
+      ↓
+① UsernamePasswordAuthenticationFilter（拦截登录请求）
+      ↓
+② UserDetailsService.loadUserByUsername(username)
+      ↓ 查数据库拿 SysUser，包装成 LoginUser 返回   ← 第1次出现
+③ DaoAuthenticationProvider 校验
+      ↓ 拿 LoginUser.getPassword() 比对密码
+      ↓ 检查 isEnabled() 等账号状态
+④ 认证成功 → 生成 Authentication 对象
+      ↓ principal 存的就是这个 LoginUser          ← 第2次出现
+⑤ 存入 SecurityContext（整个请求期间都能拿到）
+      ↓
+⑥ Controller / Service 里取出 LoginUser 用        ← 第3次出现</code></pre>
+
+    <div class="warn">
+      <strong>前后端分离 + JWT 的特殊点</strong>
+      你的项目用 JWT，所以不是「登录时存起来一直用」，而是：登录 → 生成 JWT（只存 userId）→ 后续请求带 JWT → 自定义 Filter 解析 JWT 拿到 userId → 再查一次库，重新构造 LoginUser 塞进 SecurityContext。即每个请求都重新构造一次。
+    </div>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section class="card" id="s4">
+    <h2 class="sec">4. LoginUser 在项目中的 6 处实际用法</h2>
+
+    <h3>① 认证入口 —— 包装 SysUser</h3>
+    <p><code>UserDetailsServiceImpl.loadUserByUsername()</code>：按用户名查库，包装成 LoginUser（权限传空 list）。</p>
+    <pre><code>return new LoginUser(user, Collections.emptyList());</code></pre>
+
+    <h3>② 登录签发 token —— 拿到完整用户</h3>
+    <p><code>AuthService.login()</code>：认证成功后从 principal 取 LoginUser，再 getUser() 拿 SysUser 组装返回信息。</p>
+    <pre><code>LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+SysUser user = loginUser.getUser();</code></pre>
+
+    <h3>③ JWT 过滤器 —— 每个请求重建 LoginUser</h3>
+    <p><code>JwtAuthenticationFilter.doFilterInternal()</code>：用 token 里的 userId 回查库，重新构造 LoginUser 塞进上下文，同时校验 status==1 实现「禁用用户立即失效」。</p>
+    <pre><code>SysUser user = sysUserMapper.selectById(userId);
+LoginUser loginUser = new LoginUser(user, Collections.emptyList());
+UsernamePasswordAuthenticationToken authentication =
+    new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
+SecurityContextHolder.getContext().setAuthentication(authentication);</code></pre>
+
+    <h3>④ Controller 层 —— @AuthenticationPrincipal 自动注入</h3>
+    <p><code>UserController</code> 用 Spring Security 官方注解 <code>@AuthenticationPrincipal</code> 直接注入 LoginUser，配合 <code>checkAdmin()</code> 做管理员校验。</p>
+    <pre><code>public Result&lt;Void&gt; updatePassword(...,
+        @AuthenticationPrincipal LoginUser loginUser) { ... }</code></pre>
+
+    <h3>⑤ 业务层 —— 数据归属校验</h3>
+    <p><code>SaleOrderServiceImpl.checkOwner()</code>：用 getRoleId() 判断角色 + getUserId() 判断「是不是自己创建的订单」，实现数据级权限（销售员只能操作自己的订单）。</p>
+
+    <h3>⑥ 两个横切点</h3>
+    <ul>
+      <li><code>MyMetaObjectHandler</code> —— MyBatis-Plus 自动填充 createBy，从 getUserId() 取当前登录人。</li>
+      <li><code>LogAspect</code> —— 操作日志切面，用 getUserId() + getUsername() 记录操作人。</li>
+    </ul>
+
+    <div class="tip">
+      <strong>小结</strong>
+      你的 LoginUser 已贯穿完整链路：认证 → 签发 token → 请求鉴权 → 接口注入 → 角色/数据权限 → 审计。这是当前主流的 JWT + Spring Security 标准写法，不需要改。
+    </div>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section class="card" id="s5">
+    <h2 class="sec">5. 为什么要用 LoginUser（为什么不能直接塞 SysUser）</h2>
+
+    <h3>根本原因：类型不匹配</h3>
+    <p>Spring Security 内部只操作 <code>UserDetails</code> 接口。你的 SysUser 是普通实体类，没实现那些方法，Security 拿到它根本不知道「密码是哪个字段、账号算不算启用」。所以必须有类去实现 UserDetails，把 SysUser 的字段「翻译」成接口要求的方法。</p>
+
+    <h3>为什么不直接让 SysUser 实现 UserDetails？</h3>
+    <table>
+      <tr><th>问题</th><th>说明</th></tr>
+      <tr><td>职责混乱</td><td>实体类是纯数据模型，混入安全协议违反单一职责</td></tr>
+      <tr><td>耦合</td><td>实体类被迫依赖 security 包，换框架难</td></tr>
+      <tr><td>序列化隐患</td><td>带 Collection&lt;GrantedAuthority&gt;，缓存/序列化到 Redis 易出问题</td></tr>
+      <tr><td>扩展困难</td><td>业务方法（getUserId/getRoleId/getUser）硬塞进实体会臃肿</td></tr>
+    </table>
+    <p>「包装」比「改造」更干净。</p>
+
+    <h3>准确结论</h3>
+    <p>Spring Security 不强制「额外写包装类」，只要求「必须有一个 UserDetails 的实现类」。三种做法：</p>
+    <ol>
+      <li><strong>自定义包装类</strong>（你用的 LoginUser）✅ 推荐 —— 实体干净、可加业务方法</li>
+      <li><strong>用 Security 自带的 User</strong> —— 零代码，但拿不到 SysUser 自定义字段</li>
+      <li><strong>让实体类直接实现 UserDetails</strong> —— 能用，但不推荐（耦合）</li>
+    </ol>
+  </section>
+
+  <!-- ============ 6 ============ -->
+  <section class="card" id="s6">
+    <h2 class="sec">6. Spring Security 的职责与组成</h2>
+
+    <h3>两大核心职责</h3>
+    <table>
+      <tr><th>职责</th><th>英文</th><th>解决的问题</th></tr>
+      <tr><td>认证</td><td>Authentication</td><td>你是谁？—— 校验账号密码</td></tr>
+      <tr><td>授权</td><td>Authorization</td><td>你能干什么？—— 判断有无权限</td></tr>
+    </table>
+    <p>附加能力：防 CSRF、防会话固定、密码加密（BCrypt）、记住我、CORS 等。</p>
+
+    <h3>认证流程关键组件</h3>
+    <table>
+      <tr><th>组件</th><th>作用</th><th>你项目的对应</th></tr>
+      <tr><td>SecurityFilterChain</td><td>过滤器链，请求先经过一串 Filter</td><td>SecurityConfig 里的规则</td></tr>
+      <tr><td>AuthenticationManager</td><td>认证总调度，把活派给 Provider</td><td>AuthService 里注入并调用</td></tr>
+      <tr><td>AuthenticationProvider</td><td>真正执行认证（如 DaoAuthenticationProvider）</td><td>框架默认</td></tr>
+      <tr><td>UserDetailsService</td><td>按用户名查库返回 LoginUser</td><td>UserDetailsServiceImpl</td></tr>
+      <tr><td>PasswordEncoder</td><td>密码加密/比对（BCrypt）</td><td>SecurityConfig 里的 BCryptPasswordEncoder</td></tr>
+      <tr><td>SecurityContextHolder</td><td>存当前登录用户</td><td>AuthUtil / MetaObjectHandler / LogAspect</td></tr>
+    </table>
+
+    <h3>授权流程关键组件</h3>
+    <table>
+      <tr><th>组件</th><th>作用</th></tr>
+      <tr><td>AccessDecisionManager</td><td>访问决策（投票机制）</td></tr>
+      <tr><td>@PreAuthorize 等注解</td><td>方法级鉴权</td></tr>
+      <tr><td>GrantedAuthority</td><td>权限标识对象（SimpleGrantedAuthority）</td></tr>
+    </table>
+
+    <p>你项目里已经跑通这套体系，但权限校验目前是靠 checkAdmin / checkOwner 手动判断 roleId（粗粒度），还没用 @PreAuthorize（细粒度）。</p>
+  </section>
+
+  <!-- ============ 7 ============ -->
+  <section class="card" id="s7">
+    <h2 class="sec">7. getAuthorities() 方法与泛型拆解</h2>
+
+    <h3>方法签名逐段拆解</h3>
+    <pre><code>public Collection&lt;? extends GrantedAuthority&gt; getAuthorities()</code></pre>
+    <table>
+      <tr><th>部分</th><th>含义</th></tr>
+      <tr><td>public</td><td>公开方法（接口方法必须 public）</td></tr>
+      <tr><td>Collection&lt;...&gt;</td><td>返回一个集合（List/Set），一个用户有多个权限</td></tr>
+      <tr><td>GrantedAuthority</td><td>权限接口，核心方法 getAuthority() 返回权限字符串</td></tr>
+      <tr><td>? extends</td><td>泛型通配符：GrantedAuthority 或其任意子类</td></tr>
+    </table>
+
+    <h3>方法实现逐行拆解</h3>
+    <pre><code>return permissions.stream()                 // 1. List&lt;String&gt; 转流
+        .map(SimpleGrantedAuthority::new)   // 2. 每个字符串包成 SimpleGrantedAuthority
+        .toList();                          // 3. 收集回 List</code></pre>
+
+    <h3>泛型「?」是什么</h3>
+    <p>「?」是 Java 泛型的<strong>通配符</strong>。? extends GrantedAuthority = 「GrantedAuthority 或其任意子类」。作用：让返回类型更灵活通用，不写死具体是哪种权限实现。</p>
+    <table>
+      <tr><th>写法</th><th>含义</th></tr>
+      <tr><td>? extends X</td><td>X 及其子类</td></tr>
+      <tr><td>? super X</td><td>X 及其父类</td></tr>
+      <tr><td>?</td><td>任意类型</td></tr>
+    </table>
+
+    <h3>泛型的本质作用（通俗理解）</h3>
+    <p>泛型 = 给容器「贴标签」，让编译器帮我们检查类型对不对，让类型错误提前到编译期暴露，取值时不用强转。</p>
+    <pre><code>// 没泛型：什么都塞，取值要强转，转错运行才崩
+List list = new ArrayList();  list.add("字符串");  list.add(123);
+String s = (String) list.get(0);  // 危险
+
+// 有泛型：类型错误编译就报错，取值不用转
+List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add(123);  // ❌ 编译报错</code></pre>
+
+    <div class="tip">
+      <strong>不必纠结</strong>
+      ? extends GrantedAuthority 这种泛型写法，90% 的开发平时也不深究，照框架要求写、能用就行。记住「返回一堆权限」即可。
+    </div>
+
+    <h3>UserDetails 接口的 7 个方法（必须全部实现）</h3>
+    <table>
+      <tr><th>接口方法</th><th>你的实现</th><th>返回值</th></tr>
+      <tr><td>getAuthorities()</td><td>有</td><td>权限列表（目前空）</td></tr>
+      <tr><td>getPassword()</td><td>有</td><td>user.getPassword()</td></tr>
+      <tr><td>getUsername()</td><td>有</td><td>user.getUsername()</td></tr>
+      <tr><td>isAccountNonExpired()</td><td>有</td><td>true（占位）</td></tr>
+      <tr><td>isAccountNonLocked()</td><td>有</td><td>true（占位）</td></tr>
+      <tr><td>isCredentialsNonExpired()</td><td>有</td><td>true（占位）</td></tr>
+      <tr><td>isEnabled()</td><td>有</td><td>user.getStatus() == 1</td></tr>
+    </table>
+    <p>少实现一个，IDEA 直接报错：must be declared abstract or implement abstract method。</p>
+  </section>
+
+  <!-- ============ 8 ============ -->
+  <section class="card" id="s8">
+    <h2 class="sec">8. 细粒度权限（按钮级 RBAC）详解</h2>
+
+    <h3>两套权限控制</h3>
+    <table>
+      <tr><th>权限方式</th><th>靠什么判断</th><th>现状</th></tr>
+      <tr><td>粗粒度（按角色）</td><td>roleId</td><td><span class="tag ok">✅ 在用</span> checkAdmin / checkOwner</td></tr>
+      <tr><td>细粒度（按权限点）</td><td>permissions 列表</td><td><span class="tag no">❌ 没接数据</span> 传空 list</td></tr>
+    </table>
+
+    <h3>权限标识 sys:user:add 是什么</h3>
+    <p>是一个「权限字符串」，按「模块:子模块:操作」命名。它<strong>不是 Spring Security 规定的关键字</strong>，而是你自己定义的标识。</p>
+    <pre><code>sys : user : add
+ │     │      └── 操作：add（新增）
+ │     └───────── 子模块：user（用户）
+ └─────────────── 模块：sys（系统）</code></pre>
+    <table>
+      <tr><th>权限标识</th><th>含义</th></tr>
+      <tr><td>sys:user:add</td><td>用户模块 - 新增</td></tr>
+      <tr><td>sys:user:delete</td><td>用户模块 - 删除</td></tr>
+      <tr><td>sys:order:audit</td><td>订单模块 - 审核</td></tr>
+    </table>
+    <p>它本质就是一个普通字符串，带冒号只是为了可读、不重名。</p>
+
+    <h3>权限标识必须「四处一致」</h3>
+    <table>
+      <tr><th>位置</th><th>内容</th></tr>
+      <tr><td>数据库 sys_menu.perms</td><td>sys:user:add</td></tr>
+      <tr><td>查出来塞进 permissions</td><td>["sys:user:add", ...]</td></tr>
+      <tr><td>getAuthorities() 返回</td><td>SimpleGrantedAuthority("sys:user:add")</td></tr>
+      <tr><td>注解</td><td>hasAuthority('sys:user:add')</td></tr>
+    </table>
+
+    <h3>「对上」是什么意思</h3>
+    <p>hasAuthority('sys:user:add') 本质是一个「问句 + 判断」：当前用户权限列表里有没有 sys:user:add？</p>
+    <pre><code>boolean has = userPermissions.stream()
+    .anyMatch(a -> a.getAuthority().equals("sys:user:add"));
+if (has) 放行;  else 拒绝(403);</code></pre>
+    <p><strong>对上 = 匹配 = 放行；没对上 = 拒绝。</strong>这就是权限控制的开关。</p>
+
+    <h3>Collections.emptyList() 是什么</h3>
+    <p>是一个「空列表」（里面啥也没有）。传它给 LoginUser 意思是「这个用户权限列表暂时为空，一个权限都不给」。后果：登录能用，但细粒度权限全部失效。这是「权限功能还没做、先用空值占位」的典型写法。</p>
+  </section>
+
+  <!-- ============ 9 ============ -->
+  <section class="card" id="s9">
+    <h2 class="sec">9. 如何实现细粒度权限（完整方案）</h2>
+
+    <p class="note"><strong>注意：</strong>光在接口上加 @PreAuthorize 注解不够，还得先准备好前置条件，否则反而所有人都会被拒。</p>
+
+    <h3>要让注解生效，必须满足 4 个条件</h3>
+    <table>
+      <tr><th>条件</th><th>说明</th><th>现状</th></tr>
+      <tr><td>① 开启方法级安全注解</td><td>配置类加 @EnableMethodSecurity</td><td><span class="tag no">❌ 未加</span></td></tr>
+      <tr><td>② 数据库权限数据</td><td>菜单表存好权限标识</td><td><span class="tag pending">需确认</span></td></tr>
+      <tr><td>③ 查权限传进 LoginUser</td><td>替换 emptyList</td><td><span class="tag no">❌ 传空</span></td></tr>
+      <tr><td>④ 加注解</td><td>@PreAuthorize(...)</td><td><span class="tag no">❌ 未加</span></td></tr>
+    </table>
+
+    <h3>完整实现（5 步）</h3>
+    <pre><code>// 第 1 步：开启注解
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity   // ← 加这个
+public class SecurityConfig { ... }
+
+// 第 2 步：数据库权限数据（sys_menu 加 perms 字段）
+// menu_id | menu_name | perms
+//   1     | 用户管理   | sys:user:add
+//   2     | 用户管理   | sys:user:delete
+
+// 第 3 步：Mapper 查权限
+List&lt;String&gt; selectPermsByRoleId(Long roleId);
+
+// SQL
+SELECT DISTINCT m.perms FROM sys_menu m
+JOIN sys_role_menu rm ON m.id = rm.menu_id
+WHERE rm.role_id = #{roleId} AND m.perms IS NOT NULL AND m.perms != ''
+
+// 第 4 步：喂给 LoginUser（两处 emptyList 都改）
+List&lt;String&gt; perms = sysMenuMapper.selectPermsByRoleId(user.getRoleId());
+return new LoginUser(user, perms);
+
+// 第 5 步：接口加注解
+@PreAuthorize("hasAuthority('sys:user:add')")
+@PostMapping
+public Result&lt;Void&gt; createUser(...) { ... }</code></pre>
+
+    <div class="warn">
+      <strong>动手前需确认</strong>
+      ① SecurityConfig 有没有 @EnableMethodSecurity（已确认：目前没有）；② sys_menu 表结构 + 角色菜单关联表；③ AuthService 里 selectMenuPathsByRoleId 的实现（照它风格改）。
+    </div>
+  </section>
+
+  <!-- ============ 10 ============ -->
+  <section class="card" id="s10">
+    <h2 class="sec">10. 一图总结核心概念关系</h2>
+    <pre><code>┌─────────────┐        包装        ┌──────────────────┐
+│   SysUser   │ ────────────────&gt;  │    LoginUser      │
+│ (数据库实体) │                    │ (implements       │
+└─────────────┘                    │   UserDetails)    │
+                                   └────────┬─────────┘
+                                            │ getAuthorities() 返回权限
+                                            ▼
+                              ┌─────────────────────────┐
+                              │  Collection&lt;GrantedAuthority&gt;  │
+                              │  ["sys:user:add", ...]  │
+                              └────────────┬────────────┘
+                                           │ 授权判断
+                                           ▼
+                              @PreAuthorize("hasAuthority(...)")
+                                           │
+                              匹配 → 放行   不匹配 → 403</code></pre>
+
+    <h3>一句话记住所有概念</h3>
+    <ul>
+      <li><strong>SysUser</strong>：数据库里的用户，负责存数据。</li>
+      <li><strong>LoginUser</strong>：把 SysUser 包装成 Security 认的 UserDetails，是登录态的载体。</li>
+      <li><strong>UserDetails</strong>：Security 要求的「契约」，LoginUser 兑现它（7 个方法）。</li>
+      <li><strong>getAuthorities()</strong>：回答「用户有哪些权限」，是授权的数据源头。</li>
+      <li><strong>sys:user:add</strong>：权限标识字符串，自定义，需四处一致。</li>
+      <li><strong>@PreAuthorize</strong>：授权注解，靠权限字符串匹配决定放行/拒绝。</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
