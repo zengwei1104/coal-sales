@@ -1,0 +1,9 @@
+# 本地构建产物，不复制进镜像
+target
+
+# IDE / 系统文件
+.idea
+*.iml
+.vscode
+*.log
+.DS_Store

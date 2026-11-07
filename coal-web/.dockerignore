@@ -1,0 +1,11 @@
+# 本地依赖与构建产物，绝不复制进镜像
+node_modules
+dist
+dist-ssr
+package-lock.json
+
+# IDE / 系统文件
+.vscode
+.idea
+*.log
+.DS_Store
