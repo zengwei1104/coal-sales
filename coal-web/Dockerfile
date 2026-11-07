@@ -1,6 +1,10 @@
-# ===== 构建阶段：Node 20 打包前端 =====
-FROM node:20-alpine AS build
+# ===== 构建阶段：Node 22 打包前端 =====
+FROM node:22-alpine AS build
 WORKDIR /app
+
+# 强制使用官方 npm 源（避免 lock 文件里的 npmmirror 地址导致超时）
+RUN npm config set registry https://registry.npmjs.org/
+
 COPY package*.json ./
 RUN npm install
 COPY . .
