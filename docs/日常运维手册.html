@@ -71,6 +71,7 @@
     padding: 16px 20px; margin: 16px 0; font-size: 14px;
   }
   .highlight strong { color: var(--primary); }
+  .err { color: #cf222e; }
 </style>
 </head>
 <body>
@@ -79,10 +80,11 @@
     <h3>🧭 目录导航</h3>
     <a href="#overview">一、系统概览</a>
     <a href="#daily">二、日常启动 / 关闭 / 重启</a>
-    <a href="#update">三、更新代码后重新部署</a>
-    <a href="#logs">四、查看状态与日志</a>
-    <a href="#quick">五、命令速查表</a>
-    <a href="#faq">六、常见问题</a>
+    <a href="#boot">三、虚拟机关机与开机自启</a>
+    <a href="#update">四、更新代码后重新部署</a>
+    <a href="#logs">五、查看状态与日志</a>
+    <a href="#quick">六、命令速查表</a>
+    <a href="#faq">七、常见问题</a>
   </nav>
 
   <main>
@@ -143,7 +145,102 @@
       · 更新代码 → <code>git pull</code> + <code>docker compose up -d --build</code>
     </div>
 
-    <h2 id="update">三、更新代码后重新部署</h2>
+    <h2 id="boot">三、虚拟机关机与开机自启</h2>
+
+    <h3>3.1 关闭虚拟机会怎样</h3>
+    <table>
+      <tr><th>操作</th><th>容器状态</th><th>数据</th></tr>
+      <tr>
+        <td><strong>虚拟机关机</strong>（Shut Down）</td>
+        <td>随系统停止，全部停止</td>
+        <td>✅ 不丢。数据在 <code>mysql-data</code> 卷里，落盘保存</td>
+      </tr>
+      <tr>
+        <td><strong>虚拟机挂起</strong>（Suspend）</td>
+        <td>进程被冻结，恢复后继续运行</td>
+        <td>✅ 不丢，且恢复后无需任何操作</td>
+      </tr>
+      <tr>
+        <td><strong>重启虚拟机</strong>（Reboot）</td>
+        <td>先停止，启动后按重启策略自动拉起</td>
+        <td>✅ 不丢</td>
+      </tr>
+    </table>
+    <p class="highlight">
+      ⚠️ 容器是宿主机上的进程，<strong>系统一停容器必然停</strong>，这是正常现象，不是故障。
+      关键在于「重启后能不能自动起来」。
+    </p>
+
+    <h3>3.2 开机能否自动启动？看两个条件</h3>
+    <p>要真正做到"开机即用"，需要<strong>两个条件同时满足</strong>：</p>
+    <table>
+      <tr><th>#</th><th>条件</th><th>检查命令</th><th>期望输出</th></tr>
+      <tr>
+        <td>1</td>
+        <td>Docker 服务设为开机自启</td>
+        <td><code>systemctl is-enabled docker</code></td>
+        <td><code>enabled</code></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>容器有重启策略</td>
+        <td><code>docker inspect coal-web --format '{{.HostConfig.RestartPolicy.Name}}'</code></td>
+        <td><code>unless-stopped</code></td>
+      </tr>
+    </table>
+
+    <p><strong>如果第 1 项是 <code>disabled</code>，补一条命令即可：</strong></p>
+    <pre><code>sudo systemctl enable docker</code></pre>
+
+    <p><strong>第 2 项由 docker-compose.yml 里的 <code>restart: unless-stopped</code> 保证</strong>，本项目三个服务都已配置，无需改动。</p>
+
+    <h3>3.3 开机自启的完整流程</h3>
+    <div class="arch" style="text-align:left; font-size:14px; line-height:2;">
+      ① 虚拟机开机<br>
+      ↓<br>
+      ② systemd 拉起 <code>docker.service</code>（因为 enabled）<br>
+      ↓<br>
+      ③ Docker 按 <code>restart: unless-stopped</code> 自动启动三个容器<br>
+      ↓<br>
+      ④ mysql 先启动并通过 healthcheck → backend 启动 → web 启动<br>
+      ↓<br>
+      ⑤ 系统可用，<strong>无需手动敲任何命令</strong>
+    </div>
+
+    <h3>3.4 restart 策略：unless-stopped 的含义</h3>
+    <table>
+      <tr><th>策略值</th><th>含义</th><th>手动 stop 后重启系统</th></tr>
+      <tr>
+        <td><code>no</code></td>
+        <td>永不自动重启</td>
+        <td>不会启动</td>
+      </tr>
+      <tr>
+        <td><code>always</code></td>
+        <td>总是自动重启</td>
+        <td><strong>会</strong>启动（强制）</td>
+      </tr>
+      <tr>
+        <td><strong><code>unless-stopped</code></strong></td>
+        <td>除非被手动停止，否则自动重启</td>
+        <td><strong>不会</strong>启动（尊重你的手动停止）</td>
+      </tr>
+    </table>
+
+    <div class="highlight">
+      <strong>关键例外：</strong>如果你关机前手动执行过 <code>docker compose stop</code>，
+      那么重启虚拟机后容器<strong>不会</strong>自动启动（这就是 <code>unless-stopped</code> 的语义）。
+      此时需要手动执行：<br>
+      <code>cd /opt/coal-sales &amp;&amp; docker compose start</code>
+    </div>
+
+    <p class="highlight">
+      💡 <strong>实践建议：</strong>如果你希望系统长期在线，关机时<strong>不要</strong>先
+      <code>docker compose stop</code>，直接关虚拟机即可。这样下次开机容器会自动恢复。
+      只有真正想临时停服时，才用 <code>docker compose stop</code>。
+    </p>
+
+    <h2 id="update">四、更新代码后重新部署</h2>
     <p>改了代码并 push 到远程仓库后，在虚拟机里这样更新：</p>
     <div class="step">
       <h3>1. 拉取最新代码</h3>
@@ -154,7 +251,7 @@ git pull</code></pre>
       <p><code>--build</code> 会重新执行 Dockerfile 编译代码，<strong>改了代码就必须加这个参数</strong>，否则会用旧镜像。</p>
     </div>
 
-    <h2 id="logs">四、查看状态与日志</h2>
+    <h2 id="logs">五、查看状态与日志</h2>
     <div class="cmd-card">
       <h4>📋 查看容器状态</h4>
       <p class="desc">三个容器都应显示 <code>running</code>（或 Up）。</p>
@@ -172,7 +269,7 @@ docker compose logs -f mysql     # 数据库</code></pre>
       <pre><code>docker compose logs --tail 100 backend</code></pre>
     </div>
 
-    <h2 id="quick">五、命令速查表</h2>
+    <h2 id="quick">六、命令速查表</h2>
     <table>
       <tr><th>操作</th><th>命令</th><th>说明</th></tr>
       <tr><td>进入目录</td><td><code>cd /opt/coal-sales</code></td><td>所有命令前先执行</td></tr>
@@ -182,11 +279,60 @@ docker compose logs -f mysql     # 数据库</code></pre>
       <tr><td>再次启动</td><td><code>docker compose start</code></td><td>对应 stop</td></tr>
       <tr><td>重启</td><td><code>docker compose restart</code></td><td>快速重启</td></tr>
       <tr><td>删除容器</td><td><code>docker compose down</code></td><td>数据不丢</td></tr>
+      <tr><td>删除容器 + 数据卷</td><td><code>docker compose down -v</code></td><td class="err">⚠️ 数据全删，慎用</td></tr>
       <tr><td>查看状态</td><td><code>docker compose ps</code></td><td>看是否 running</td></tr>
       <tr><td>查看日志</td><td><code>docker compose logs -f 服务名</code></td><td>实时滚动</td></tr>
+      <tr><td>确认 Docker 开机自启</td><td><code>systemctl is-enabled docker</code></td><td>应输出 enabled</td></tr>
     </table>
 
-    <h2 id="faq">六、常见问题</h2>
+    <h3>6.1 五个容易混淆的命令对比</h3>
+    <table>
+      <tr><th>命令</th><th>是否重新编译</th><th>容器</th><th>数据</th><th>典型场景</th></tr>
+      <tr>
+        <td><code>up -d</code></td>
+        <td>否</td>
+        <td>存在则启动，缺失则创建</td>
+        <td>保留</td>
+        <td>日常开机启动</td>
+      </tr>
+      <tr>
+        <td><code>up -d --build</code></td>
+        <td><strong>是</strong></td>
+        <td>重新构建镜像后启动</td>
+        <td>保留</td>
+        <td>改了代码 / 改了 Dockerfile</td>
+      </tr>
+      <tr>
+        <td><code>start</code></td>
+        <td>否</td>
+        <td>只启动已停止的容器</td>
+        <td>保留</td>
+        <td>配合 <code>stop</code> 使用</td>
+      </tr>
+      <tr>
+        <td><code>restart</code></td>
+        <td>否</td>
+        <td>重启运行中的容器</td>
+        <td>保留</td>
+        <td>服务卡住想快速恢复</td>
+      </tr>
+      <tr>
+        <td><code>down</code></td>
+        <td>—</td>
+        <td><strong>删除</strong>容器和网络</td>
+        <td>保留（卷还在）</td>
+        <td>彻底清理后重建</td>
+      </tr>
+      <tr>
+        <td><code>down -v</code></td>
+        <td>—</td>
+        <td><strong>删除</strong>容器和网络</td>
+        <td class="err"><strong>全删</strong></td>
+        <td>需要重新初始化数据库</td>
+      </tr>
+    </table>
+
+    <h2 id="faq">七、常见问题</h2>
     <table>
       <tr><th>问题</th><th>排查 / 解决</th></tr>
       <tr><td>提示「找不到 docker-compose.yml」</td><td>没进对目录，先 <code>cd /opt/coal-sales</code></td></tr>
@@ -194,6 +340,40 @@ docker compose logs -f mysql     # 数据库</code></pre>
       <tr><td>改了代码但没生效</td><td>是不是忘了加 <code>--build</code>？更新必须用 <code>docker compose up -d --build</code></td></tr>
       <tr><td>重启后数据还在吗</td><td>在。数据库数据存在 <code>mysql-data</code> 卷里，stop / restart / down 都不会丢</td></tr>
       <tr><td>想彻底清空数据库重来</td><td>删除卷：<code>docker compose down -v</code>（⚠️ 会删除所有数据，慎用）</td></tr>
+      <tr>
+        <td>关闭虚拟机后项目会自己停吗</td>
+        <td>会。容器是宿主机进程，系统停止容器必然停止，但<strong>数据不丢</strong>（存在数据卷里）</td>
+      </tr>
+      <tr>
+        <td>重启虚拟机后要手动启动吗</td>
+        <td>
+          正常<strong>不需要</strong>。只要 <code>systemctl is-enabled docker</code> 输出
+          <code>enabled</code>，且容器策略为 <code>unless-stopped</code>，开机会自动拉起。
+          但如果关机前手动执行过 <code>docker compose stop</code>，则需手动
+          <code>docker compose start</code>
+        </td>
+      </tr>
+      <tr>
+        <td>怎么确认开机自启已生效</td>
+        <td>
+          <code>systemctl is-enabled docker</code> → 应为 <code>enabled</code>；
+          <code>docker inspect coal-web --format '{{.HostConfig.RestartPolicy.Name}}'</code>
+          → 应为 <code>unless-stopped</code>
+        </td>
+      </tr>
+      <tr>
+        <td>开机自启没生效怎么修</td>
+        <td><code>sudo systemctl enable docker</code>，然后重启虚拟机验证</td>
+      </tr>
+      <tr>
+        <td>数据库中文变成乱码</td>
+        <td>
+          初始化导入时客户端字符集为 latin1 导致。需确保 SQL 脚本首行有
+          <code>SET NAMES utf8mb4;</code>，然后
+          <code>docker compose down -v &amp;&amp; docker compose up -d</code> 重新初始化。
+          详见《部署问题排查记录》
+        </td>
+      </tr>
     </table>
   </main>
 </div>
