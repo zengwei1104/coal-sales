@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>煤炭销售管理系统 · 部署问题排查记录</title>
+<style>
+  :root {
+    --primary: #1f6feb;
+    --bg: #f6f8fa;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --border: #d0d7de;
+    --accent: #0969da;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #24292f;
+    line-height: 1.7;
+    background: var(--bg);
+  }
+  .container { display: flex; max-width: 1200px; margin: 0 auto; }
+  nav {
+    width: 250px; min-width: 250px; padding: 24px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: #fff; border-right: 1px solid var(--border);
+  }
+  nav h3 { font-size: 14px; color: #57606a; margin: 0 0 12px; }
+  nav a {
+    display: block; padding: 6px 12px; margin-bottom: 4px;
+    color: #24292f; text-decoration: none; font-size: 14px;
+    border-radius: 6px;
+  }
+  nav a:hover { background: #f0f6ff; color: var(--primary); }
+  main { flex: 1; padding: 32px 40px; min-width: 0; }
+  h1 { font-size: 28px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+  h2 { font-size: 22px; margin-top: 40px; color: #1f2328; border-left: 4px solid var(--primary); padding-left: 12px; }
+  h3 { font-size: 17px; margin-top: 28px; }
+  blockquote {
+    margin: 16px 0; padding: 8px 16px; background: #fff8c5;
+    border-left: 4px solid #d4a72c; border-radius: 4px; font-size: 14px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 16px; border-radius: 8px; overflow-x: auto;
+    font-size: 13px; line-height: 1.6;
+  }
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  p code, li code, td code { background: #eef1f4; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  table { border-collapse: collapse; margin: 16px 0; width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; font-size: 14px; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 8px; }
+  .tag.warn { background: #fff1f0; color: #cf222e; }
+  .tag.info { background: #ddf4ff; color: #0969da; }
+  .tag.ok { background: #dafbe1; color: #1a7f37; }
+  .step { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .issue {
+    background: #fff; border: 1px solid var(--border); border-left: 4px solid #cf222e;
+    border-radius: 8px; padding: 18px 22px; margin: 18px 0;
+  }
+  .issue.fixed { border-left-color: #1a7f37; }
+  .issue h3 { margin-top: 0; }
+  .label {
+    display: inline-block; font-size: 12px; font-weight: 600; color: #57606a;
+    background: #f6f8fa; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 8px; margin-right: 6px;
+  }
+  .cause {
+    background: #fff8c5; border-left: 4px solid #d4a72c;
+    padding: 10px 16px; border-radius: 4px; margin: 12px 0; font-size: 14px;
+  }
+  .fix {
+    background: #dafbe1; border-left: 4px solid #1a7f37;
+    padding: 10px 16px; border-radius: 4px; margin: 12px 0; font-size: 14px;
+  }
+  .err { color: #cf222e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <h3>🔧 排查导航</h3>
+    <a href="#overview">一、问题总览</a>
+    <a href="#p1">问题1 · 镜像拉取失败</a>
+    <a href="#p2">问题2 · npm 源超时</a>
+    <a href="#p3">问题3 · 原生绑定缺失</a>
+    <a href="#p4">问题4 · heredoc 卡死</a>
+    <a href="#p5">问题5 · git 推送认证</a>
+    <a href="#p6">问题6 · gitignore 误伤</a>
+    <a href="#p7">问题7 · CRLF 换行</a>
+    <a href="#summary">二、根因总结</a>
+    <a href="#checklist">三、避坑清单</a>
+  </nav>
+
+  <main>
+    <h1>煤炭销售管理系统 · 部署问题排查记录</h1>
+    <p>
+      <span class="tag warn">7 个问题</span>
+      <span class="tag info">Docker Compose</span>
+      <span class="tag ok">已全部解决</span>
+    </p>
+    <blockquote>
+      本文记录了在 AlmaLinux 10.2 虚拟机上首次 Docker 部署本项目时遇到的全部问题、根因分析与解决方案。
+      环境：VMware 虚拟机 + AlmaLinux 10.2 + Docker CE 29.9.3。
+    </blockquote>
+
+    <h2 id="overview">一、问题总览</h2>
+    <table>
+      <tr><th>#</th><th>问题</th><th>关键报错</th><th>根因分类</th><th>状态</th></tr>
+      <tr>
+        <td>1</td><td>拉取 MySQL 镜像失败</td>
+        <td class="err">connect: connection refused</td>
+        <td>国内网络 / Docker Hub 阻断</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>2</td><td>前端 npm install 超时</td>
+        <td class="err">ETIMEDOUT registry.npmmirror.com</td>
+        <td>lock 锁死镜像源 + 网络</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>3</td><td>前端 vite build 找不到原生模块</td>
+        <td class="err">Cannot find native binding</td>
+        <td>Windows ↔ Linux 跨平台差异</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>4</td><td>多行命令粘贴后终端卡住</td>
+        <td>提示符变成 <code>&gt;</code></td>
+        <td>Shell heredoc 未闭合</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>5</td><td>git push 无提示认证</td>
+        <td class="err">could not read Username</td>
+        <td>终端无法交互输入凭证</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>6</td><td>关键文件没进 git 仓库</td>
+        <td>部署时前端缺 package.json</td>
+        <td>.gitignore 规则误伤</td>
+        <td>✅ 已解决</td>
+      </tr>
+      <tr>
+        <td>7</td><td>部署脚本换行符不符</td>
+        <td>LF will be replaced by CRLF</td>
+        <td>Windows ↔ Linux 换行符差异</td>
+        <td>✅ 已解决</td>
+      </tr>
+    </table>
+
+    <!-- ================= 问题 1 ================= -->
+    <h2 id="p1">问题 1 · 拉取 MySQL 镜像失败</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>✘ Image mysql:8.0 Error failed to resolve reference "docker.io/library/mysql:8.0"
+Error response from daemon: failed to resolve reference "docker.io/library/mysql:8.0":
+failed to do request: Head "https://registry-1.docker.io/v2/library/mysql/manifests/8.0":
+dial tcp 103.56.16.112:443: connect: connection refused</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        Docker 默认从 Docker Hub（<code>docker.io</code>）拉取镜像，而国内网络访问该域名会被阻断，
+        直接报 <code>connection refused</code>（连接被拒绝，不是"慢"）。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        配置国内镜像加速器，写入 <code>/etc/docker/daemon.json</code>，重启 Docker 生效。
+      </div>
+
+      <p><strong>操作步骤：</strong></p>
+      <pre><code>sudo mkdir -p /etc/docker
+
+sudo tee /etc/docker/daemon.json > /dev/null &lt;&lt;'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://dockerproxy.com",
+    "https://docker.nju.edu.cn"
+  ]
+}
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart docker</code></pre>
+
+      <p><strong>验证：</strong>能看到三个镜像源即生效。</p>
+      <pre><code>docker info | grep -A5 "Registry Mirrors"</code></pre>
+    </div>
+
+    <!-- ================= 问题 2 ================= -->
+    <h2 id="p2">问题 2 · 前端 npm install 超时</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>[web build 4/6] RUN npm install
+npm error code ETIMEDOUT
+npm error network request to https://registry.npmmirror.com/tinyglobby/-/tinyglobby-0.2.17.tgz
+       failed, reason:
+npm error network This is a problem related to network connectivity.</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        <code>coal-web/package-lock.json</code> 里 <strong>121 个依赖包的 <code>resolved</code> 下载地址
+        被锁死成了 <code>registry.npmmirror.com</code></strong>（本地开发机的 npm 全局源是淘宝镜像）。
+        容器内执行 <code>npm install</code> 会严格按 lock 里的地址下载，而该源在虚拟机网络下请求超时。
+        <br><br>
+        同时 <code>node:20</code> 版本偏低，<code>vite@8</code>、<code>@vueuse/core@15</code> 都要求
+        <code>node &gt;= 22</code>，触发 <code>EBADENGINE</code> 警告。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        ① Dockerfile 内强制使用官方 npm 源；② Node 升级到 22。
+      </div>
+
+      <pre><code>FROM node:22-alpine AS build
+WORKDIR /app
+
+# 强制使用官方 npm 源
+RUN npm config set registry https://registry.npmjs.org/
+
+COPY package*.json ./
+RUN npm install</code></pre>
+
+      <blockquote>
+        注意：仅设置 <code>npm config set registry</code> 还不够——若 lock 文件里已有绝对
+        <code>resolved</code> 地址，npm 仍会按 lock 下载。必须同时清理/重新生成 lock 文件。
+      </blockquote>
+    </div>
+
+    <!-- ================= 问题 3 ================= -->
+    <h2 id="p3">问题 3 · vite build 找不到原生绑定（最关键）</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>=> ERROR [web build 7/7] RUN npm run build
+&gt; vite build
+
+Error: Cannot find native binding. npm has a bug related to optional dependencies.
+    cause: Error: Cannot find module '@rolldown/binding-wasm32-wasi'
+    cause: Error: Cannot find module '@rolldown/binding-linux-x64-musl'
+    cause: Error: Cannot find module './rolldown-binding.linux-x64-musl.node'</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        <code>vite@8</code> 使用 <strong>rolldown</strong>（Rust 编写的打包器），需要对应平台的
+        原生二进制模块。这些平台绑定通过 npm 的 <strong>optional dependencies</strong> 分发
+        （每个平台一个包，安装时只装当前平台的那个）。
+        <br><br>
+        <code>package-lock.json</code> 是在 <strong>Windows</strong> 上生成的，只记录了
+        Windows 平台的绑定条目，<strong>Linux/musl 的条目根本没被写进 lock</strong>。
+        容器（Linux + Alpine）内按 lock 安装，自然缺少
+        <code>@rolldown/binding-linux-x64-musl</code>，构建时加载失败。
+        <br><br>
+        <strong>这是本次部署最隐蔽的坑：本地能跑，容器里必炸。</strong>
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        容器内不使用 Windows 生成的 lock 文件，让 npm 在 Linux 环境中现场解析依赖。
+      </div>
+
+      <p><strong>方案 A（采用）：只复制 package.json，不复制 lock</strong></p>
+      <pre><code># coal-web/Dockerfile
+COPY package.json ./
+RUN npm install</code></pre>
+
+      <p><strong>方案 B：跨平台安装（保留 lock 时可用）</strong></p>
+      <pre><code>RUN npm install --os=linux --cpu=x64 --libc=musl</code></pre>
+
+      <p><strong>配套：新增 <code>coal-web/.dockerignore</code></strong>，防止本地 node_modules 污染镜像</p>
+      <pre><code>node_modules
+dist
+dist-ssr
+package-lock.json</code></pre>
+
+      <blockquote>
+        代价：放弃版本锁定（每次构建按 semver 取最新兼容版本）。对个人项目可接受，
+        换来的是构建稳定。若要严格锁版本，建议在 Linux 环境下生成 lock 文件。
+      </blockquote>
+    </div>
+
+    <!-- ================= 问题 4 ================= -->
+    <h2 id="p4">问题 4 · 多行命令粘贴后终端卡住</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>[zengwei@localhost coal-sales]$ sudo tee /etc/docker/daemon.json &gt; /dev/null &lt;&lt;'EOF' { ... } EOF sudo systemctl ...
+&gt; 
+&gt;
+卡住了</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        多条命令被粘贴成一行，<code>heredoc</code> 的结束符 <code>EOF</code> 没有单独成行，
+        Shell 认为输入还没结束，持续显示 <code>&gt;</code> 等待后续输入。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        按 <kbd>Ctrl+C</kbd> 退出，然后<strong>一条一条执行</strong>，确保 <code>EOF</code>
+        单独一行且<strong>顶格</strong>（前面不能有空格）。
+      </div>
+    </div>
+
+    <!-- ================= 问题 5 ================= -->
+    <h2 id="p5">问题 5 · git push 无法输入账号密码</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>$ git push origin main
+fatal: could not read Username for 'https://github.com': terminal prompts disabled</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        非交互式终端无法弹出凭证输入提示，HTTPS 方式推送 GitHub 需要用户名 + Personal Access Token。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        在自己的终端里手动执行一次 <code>git push</code> 并输入凭证，之后凭证会被缓存，
+        后续自动推送即可成功。
+      </div>
+
+      <p><strong>凭证说明：</strong>密码不是 GitHub 登录密码，而是
+        Personal Access Token（GitHub → Settings → Developer settings → Personal access tokens）。</p>
+    </div>
+
+    <!-- ================= 问题 6 ================= -->
+    <h2 id="p6">问题 6 · 关键部署文件没进 git 仓库</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <p><code>git ls-files</code> 检查发现，以下关键文件<strong>完全没有被 git 跟踪</strong>：</p>
+      <ul>
+        <li><code>coal-web/package.json</code> / <code>package-lock.json</code>（前端构建必需）</li>
+        <li><code>coal-web/Dockerfile</code> / <code>nginx.conf</code></li>
+        <li><code>coal-sales/Dockerfile</code></li>
+        <li><code>docker-compose.yml</code></li>
+      </ul>
+      <p>如果直接 <code>git clone</code> 到服务器，前端会因缺少 package.json 而构建失败。</p>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        根目录 <code>.gitignore</code> 末尾有三条<strong>不带路径前缀</strong>的规则：
+        <pre style="margin:8px 0"><code>node_modules/
+package-lock.json
+package.json</code></pre>
+        这类规则会匹配<strong>所有层级</strong>的同名文件，把 <code>coal-web/package.json</code>
+        也一起忽略了。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        加上 <code>/</code> 前缀，限定只忽略根目录下的同名文件。
+      </div>
+      <pre><code># 根目录下的前端依赖（可能是误操作生成的）
+/node_modules/
+/package-lock.json
+/package.json</code></pre>
+    </div>
+
+    <!-- ================= 问题 7 ================= -->
+    <h2 id="p7">问题 7 · 部署文件换行符被转成 CRLF</h2>
+    <div class="issue fixed">
+      <h3>现象</h3>
+      <pre><code>warning: in the working copy of 'coal-web/Dockerfile', LF will be replaced by CRLF
+warning: in the working copy of 'docker-compose.yml', LF will be replaced by CRLF</code></pre>
+
+      <div class="cause">
+        <span class="label">根因</span>
+        Windows 上 Git 默认 <code>core.autocrlf=true</code>，检出时会把 LF 转成 CRLF。
+        而 Dockerfile、shell 脚本、nginx.conf 等在 Linux 容器内执行时更适应 LF，
+        CRLF 可能导致脚本执行异常（如 <code>/bin/sh^M: bad interpreter</code>）。
+      </div>
+
+      <div class="fix">
+        <span class="label">解决</span>
+        新增根目录 <code>.gitattributes</code>，强制关键文件使用 LF。
+      </div>
+      <pre><code># 强制部署关键文件使用 LF 换行符
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf
+docker-compose.yml text eol=lf
+*.sql text eol=lf
+mvnw text eol=lf</code></pre>
+    </div>
+
+    <!-- ================= 根因总结 ================= -->
+    <h2 id="summary">二、根因总结</h2>
+    <p>7 个问题看似零散，实际上可以归为<strong>两大类</strong>：</p>
+
+    <table>
+      <tr><th>类别</th><th>涉及问题</th><th>本质</th></tr>
+      <tr>
+        <td><strong>跨平台差异</strong><br>Windows 开发 → Linux 部署</td>
+        <td>问题 3、问题 7</td>
+        <td>
+          依赖里的原生模块（rolldown / esbuild / sharp 等）各平台编译不同版本；
+          换行符约定也不同。本地能跑 ≠ 容器能跑。
+        </td>
+      </tr>
+      <tr>
+        <td><strong>国内网络环境</strong></td>
+        <td>问题 1、问题 2</td>
+        <td>
+          Docker Hub、npm 官方源、Maven 中央仓库在国内访问不稳定，
+          必须配置国内镜像加速（Docker 镜像源 / npm 源 / 阿里云 Maven 镜像）。
+        </td>
+      </tr>
+      <tr>
+        <td><strong>工程配置疏漏</strong></td>
+        <td>问题 4、5、6</td>
+        <td>
+          .gitignore 规则写得太宽泛、非交互终端无法输入凭证、多行命令粘贴方式不当。
+        </td>
+      </tr>
+    </table>
+
+    <blockquote>
+      <strong>核心认知：</strong>首次 Docker 构建需要下载约 2GB 基础镜像 + npm 全套依赖 + Maven 全套依赖，
+      任一环节网络或平台不匹配就会失败。这类问题属于<strong>一次性成本</strong>——
+      镜像构建成功后即固化，后续 <code>docker compose up -d</code> 只需几秒，无需联网。
+    </blockquote>
+
+    <!-- ================= 避坑清单 ================= -->
+    <h2 id="checklist">三、避坑清单（重要）</h2>
+
+    <h3>3.1 部署前必查</h3>
+    <table>
+      <tr><th>序号</th><th>检查项</th><th>命令 / 做法</th></tr>
+      <tr>
+        <td>1</td>
+        <td>Docker 镜像加速器已配置</td>
+        <td><code>docker info | grep -A5 "Registry Mirrors"</code></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>关键文件已被 git 跟踪</td>
+        <td><code>git ls-files | grep -E "Dockerfile|compose|package.json"</code></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>容器内不复用 Windows 生成的 lock</td>
+        <td>Dockerfile 用 <code>COPY package.json ./</code>，或加 <code>--os=linux</code></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>已配置 <code>.dockerignore</code></td>
+        <td>排除 <code>node_modules</code>、<code>dist</code>、<code>target</code></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Maven 走国内镜像</td>
+        <td>阿里云 <code>maven.aliyun.com/repository/public</code></td>
+      </tr>
+    </table>
+
+    <h3>3.2 以后新增前端依赖时</h3>
+    <div class="step">
+      <p>如果新装的依赖带原生模块（sharp、canvas、rolldown、esbuild 等），可能再次出现"平台绑定缺失"。</p>
+      <p><strong>规避方法：</strong></p>
+      <ul>
+        <li>不要在 Windows 上生成 lock 后直接用于 Linux 容器构建；</li>
+        <li>或安装时显式指定目标平台：<code>npm install --os=linux --cpu=x64 --libc=musl</code>；</li>
+        <li>或直接在容器内执行 <code>npm install</code> 验证。</li>
+      </ul>
+    </div>
+
+    <h3>3.3 命令操作注意</h3>
+    <table>
+      <tr><th>场景</th><th>注意点</th></tr>
+      <tr>
+        <td>粘贴多行命令</td>
+        <td>heredoc 的 <code>EOF</code> 必须单独一行顶格；否则按 <kbd>Ctrl+C</kbd> 退出后分步执行</td>
+      </tr>
+      <tr>
+        <td>git push</td>
+        <td>非交互终端会报 <code>could not read Username</code>，需在本地终端手动推送一次以缓存凭证</td>
+      </tr>
+      <tr>
+        <td>首次构建</td>
+        <td>耗时可能 20 分钟以上，<strong>中途不要 Ctrl+C</strong></td>
+      </tr>
+      <tr>
+        <td>改了代码后</td>
+        <td>必须用 <code>docker compose up -d --build</code>，否则仍用旧镜像</td>
+      </tr>
+    </table>
+
+    <h3>3.4 正确的最终 Dockerfile</h3>
+    <p><strong>coal-web/Dockerfile（前端）</strong></p>
+    <pre><code># ===== 构建阶段：Node 22 打包前端 =====
+FROM node:22-alpine AS build
+WORKDIR /app
+
+# 强制使用官方 npm 源
+RUN npm config set registry https://registry.npmjs.org/
+
+# 只复制 package.json，不带 lock 文件
+# 原因：package-lock.json 在 Windows 上生成，只记录了 Windows 平台的 rolldown 原生绑定，
+# 容器内（Linux/musl）按 lock 安装会缺 @rolldown/binding-linux-x64-musl，
+# 导致 vite build 报 "Cannot find native binding"。
+COPY package.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# ===== 运行阶段：Nginx 托管静态文件 =====
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80</code></pre>
+
+    <p><strong>coal-sales/Dockerfile（后端）</strong></p>
+    <pre><code># ===== 构建阶段：Maven + JDK 21 打包 =====
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# 配置阿里云 Maven 镜像，大幅加速国内依赖下载
+RUN mkdir -p /root/.m2 &amp;&amp; \
+    printf '%s\n' \
+    '&lt;settings&gt;' \
+    '  &lt;mirrors&gt;' \
+    '    &lt;mirror&gt;' \
+    '      &lt;id&gt;aliyun&lt;/id&gt;' \
+    '      &lt;name&gt;Aliyun Maven&lt;/name&gt;' \
+    '      &lt;url&gt;https://maven.aliyun.com/repository/public&lt;/url&gt;' \
+    '      &lt;mirrorOf&gt;central&lt;/mirrorOf&gt;' \
+    '    &lt;/mirror&gt;' \
+    '  &lt;/mirrors&gt;' \
+    '&lt;/settings&gt;' \
+    &gt; /root/.m2/settings.xml
+
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+# ===== 运行阶段：只保留 JRE + jar =====
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /app/target/coal-sales-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+
+    <div class="fix" style="margin-top:24px">
+      <span class="label">结论</span>
+      以上问题全部修复后，<code>docker compose up -d --build</code> 可一次性完成：
+      拉取镜像 → 编译前端 → 编译后端 → 初始化数据库 → 启动三容器。
+      后续日常运维只需 <code>docker compose up -d</code> / <code>stop</code> / <code>restart</code>，
+      详见《日常运维手册》。
+    </div>
+  </main>
+</div>
+</body>
+</html>
