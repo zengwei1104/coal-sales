@@ -25,3 +25,7 @@ Thumbs.db
 /node_modules/
 /package-lock.json
 /package.json
+
+# 本地临时/备份文件
+sql/init.sql.bak
+coal-sales/skills-lock.json
