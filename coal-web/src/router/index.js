@@ -113,6 +113,19 @@ const routes = [
         component: () => import('../views/report/stockWarning/index.vue'),
         meta: { title: '库存预警' }
       },
+      // ---- 系统管理 ----
+      {
+        path: 'system/user',
+        name: 'SysUser',
+        component: () => import('../views/system/user/index.vue'),
+        meta: { title: '用户管理' }
+      },
+      {
+        path: 'system/role',
+        name: 'SysRole',
+        component: () => import('../views/system/role/index.vue'),
+        meta: { title: '角色管理' }
+      },
       // ---- 其他模块页面后续按同样方式逐个补充 ----
     ]
   }

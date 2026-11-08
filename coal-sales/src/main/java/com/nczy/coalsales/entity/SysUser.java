@@ -1,6 +1,7 @@
 package com.nczy.coalsales.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -19,7 +20,8 @@ public class SysUser {
     /** 登录名 */
     private String username;
 
-    /** 密码（BCrypt 密文） */
+    /** 密码（BCrypt 密文）—— 禁止序列化给前端 */
+    @JsonIgnore
     private String password;
 
     /** 真实姓名 */

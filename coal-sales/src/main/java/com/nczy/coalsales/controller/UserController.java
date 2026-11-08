@@ -59,9 +59,10 @@ public class UserController {
     @GetMapping
     public Result<PageResult<SysUser>> page(@RequestParam(defaultValue = "1") Long current,
                                             @RequestParam(defaultValue = "10") Long size,
-                                             @AuthenticationPrincipal LoginUser loginUser) {
+                                            @RequestParam(required = false) String keyword,
+                                            @AuthenticationPrincipal LoginUser loginUser) {
         checkAdmin(loginUser);
-        return Result.success(userService.pageUsers(current, size));
+        return Result.success(userService.pageUsers(current, size, keyword));
     }
     @PostMapping
     public Result<Void> createUser(@RequestBody @Valid UserCreateDTO dto,@AuthenticationPrincipal LoginUser loginUser) {

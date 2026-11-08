@@ -71,12 +71,20 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser>
     }
 
     @Override
-    public PageResult<SysUser> pageUsers(Long current, Long size) {
-        // 按创建时间倒序，构造分页对象
-        Page<SysUser> page = page(
-                new Page<>(current, size),
-                new LambdaQueryWrapper<SysUser>().orderByDesc(SysUser::getCreateTime)
-        );
+    public PageResult<SysUser> pageUsers(Long current, Long size, String keyword) {
+        // 按创建时间倒序
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .orderByDesc(SysUser::getCreateTime);
+
+        // 关键字：登录名 / 真实姓名 / 手机号 模糊匹配（外层加括号，避免 or 破坏其他条件）
+        if (StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(SysUser::getUsername, kw)
+                    .or().like(SysUser::getRealName, kw)
+                    .or().like(SysUser::getPhone, kw));
+        }
+
+        Page<SysUser> page = page(new Page<>(current, size), wrapper);
         // 转成统一分页结构返回
         return PageResult.of(page);
     }

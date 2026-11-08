@@ -13,7 +13,12 @@ public interface SysUserService extends IService<SysUser> {
 
     void deleteUser(Long id);
 
-    PageResult<SysUser> pageUsers(Long current, Long size);
+    /**
+     * 分页查询用户
+     *
+     * @param keyword 关键字，按登录名 / 真实姓名 / 手机号模糊匹配，可为空
+     */
+    PageResult<SysUser> pageUsers(Long current, Long size, String keyword);
 
     void createUser(@Valid UserCreateDTO dto);
 
