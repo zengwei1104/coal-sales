@@ -126,6 +126,12 @@ const routes = [
         component: () => import('../views/system/role/index.vue'),
         meta: { title: '角色管理' }
       },
+      {
+        path: 'system/dict',
+        name: 'SysDict',
+        component: () => import('../views/system/dict/index.vue'),
+        meta: { title: '数据字典' }
+      },
       // ---- 其他模块页面后续按同样方式逐个补充 ----
     ]
   }
