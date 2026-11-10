@@ -72,6 +72,13 @@
   }
   .highlight strong { color: var(--primary); }
   .err { color: #cf222e; }
+  kbd {
+    display: inline-block; padding: 1px 6px; font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #24292f; background: #f6f8fa;
+    border: 1px solid #d0d7de; border-bottom-width: 2px;
+    border-radius: 4px; line-height: 1.6; white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -257,17 +264,95 @@ git pull</code></pre>
       <p class="desc">三个容器都应显示 <code>running</code>（或 Up）。</p>
       <pre><code>docker compose ps</code></pre>
     </div>
+
+    <h3>5.1 两种看日志的方式</h3>
+    <table>
+      <tr><th>方式</th><th>命令</th><th>特点</th><th>适用场景</th></tr>
+      <tr>
+        <td><strong>一次性输出</strong> ✅ 推荐</td>
+        <td><code>docker compose logs --tail 50 backend</code></td>
+        <td>输出固定一段，看完自动回到命令行</td>
+        <td>日常排查问题</td>
+      </tr>
+      <tr>
+        <td><strong>实时滚动</strong></td>
+        <td><code>docker compose logs -f backend</code></td>
+        <td>持续输出新日志，需手动退出</td>
+        <td>观察启动过程、复现问题时</td>
+      </tr>
+    </table>
+
+    <div class="highlight">
+      <strong>为什么优先用 <code>--tail</code> 而不是 <code>-f</code>：</strong>
+      排查问题时，<code>-f</code> 会一直往下刷，历史报错被瞬间冲走，很难看清；
+      <code>--tail 50</code> 是一次性输出完整一段日志，更容易定位异常。
+    </div>
+
+    <h3>5.2 常用日志命令</h3>
     <div class="cmd-card">
-      <h4>📄 查看日志（实时滚动）</h4>
-      <pre><code>docker compose logs -f web       # 前端
-docker compose logs -f backend   # 后端
-docker compose logs -f mysql     # 数据库</code></pre>
-      <p class="desc">按 <code>Ctrl+C</code> 退出日志查看（<strong>不影响</strong>容器运行）。</p>
+      <h4>📄 看最后 N 行（最常用）</h4>
+      <pre><code>docker compose logs --tail 50 backend   # 后端最后 50 行
+docker compose logs --tail 100 web      # 前端最后 100 行
+docker compose logs --tail 50 mysql     # 数据库最后 50 行</code></pre>
     </div>
     <div class="cmd-card">
-      <h4>📄 查看最近 100 行日志（不实时）</h4>
-      <pre><code>docker compose logs --tail 100 backend</code></pre>
+      <h4>🕐 按时间范围看</h4>
+      <pre><code>docker compose logs --since 10m     # 最近 10 分钟
+docker compose logs --since 2h      # 最近 2 小时
+docker compose logs --since 1d      # 最近 1 天</code></pre>
     </div>
+    <div class="cmd-card">
+      <h4>🔍 只看报错（过滤关键字）</h4>
+      <pre><code>docker compose logs --tail 200 backend | grep -i error
+docker compose logs --tail 200 backend | grep -iE "error|exception|failed"</code></pre>
+      <p class="desc">日志太长时先过滤，能快速定位问题行。</p>
+    </div>
+    <div class="cmd-card">
+      <h4>📚 看全部日志 / 全部服务</h4>
+      <pre><code>docker compose logs              # 所有服务的日志
+docker compose logs backend      # 只看后端
+docker compose logs mysql        # 只看数据库
+docker compose logs web          # 只看前端</code></pre>
+    </div>
+
+    <h3>5.3 怎么退出日志查看</h3>
+    <table>
+      <tr><th>当前状态</th><th>退出方式</th><th>容器会怎样</th></tr>
+      <tr>
+        <td>正在 <code>logs -f</code> 实时滚动</td>
+        <td>按 <kbd>Ctrl</kbd> + <kbd>C</kbd></td>
+        <td>✅ <strong>继续运行</strong>，只是停止查看</td>
+      </tr>
+      <tr>
+        <td>输出过长，进入了分页模式（<code>less</code>）</td>
+        <td>按 <kbd>q</kbd></td>
+        <td>✅ 不影响</td>
+      </tr>
+      <tr>
+        <td>用 <code>docker compose up</code>（<strong>没加 <code>-d</code></strong>）启动的</td>
+        <td>按 <kbd>Ctrl</kbd> + <kbd>C</kbd></td>
+        <td class="err">⚠️ <strong>会停止容器</strong></td>
+      </tr>
+    </table>
+
+    <div class="highlight">
+      <strong>放心按 <kbd>Ctrl</kbd>+<kbd>C</kbd>：</strong>
+      正常部署用的都是 <code>docker compose up -d</code>（后台运行），
+      此时看日志按 <kbd>Ctrl</kbd>+<kbd>C</kbd> 只是退出查看，<strong>容器不受任何影响</strong>。
+    </div>
+
+    <h3>5.4 判断后端是否启动成功</h3>
+    <p>看后端日志，<strong>出现下面两行</strong>才算真的起来了：</p>
+    <pre><code>Tomcat started on port 8080
+Started CoalSalesApplication in x.xxx seconds</code></pre>
+    <p>如果看到这些关键字，说明有问题：</p>
+    <table>
+      <tr><th>日志关键字</th><th>含义</th></tr>
+      <tr><td class="err"><code>Communications link failure</code></td><td>连不上 MySQL，检查 mysql 容器是否 healthy</td></tr>
+      <tr><td class="err"><code>Access denied for user</code></td><td>数据库账号密码错误</td></tr>
+      <tr><td class="err"><code>Unknown database</code></td><td>数据库没初始化，需要 <code>down -v</code> 重来</td></tr>
+      <tr><td class="err"><code>Application run failed</code></td><td>启动过程报错，往上翻找第一个 Exception</td></tr>
+    </table>
 
     <h2 id="quick">六、命令速查表</h2>
     <table>
@@ -372,6 +457,36 @@ docker compose logs -f mysql     # 数据库</code></pre>
           <code>SET NAMES utf8mb4;</code>，然后
           <code>docker compose down -v &amp;&amp; docker compose up -d</code> 重新初始化。
           详见《部署问题排查记录》
+        </td>
+      </tr>
+      <tr>
+        <td>日志刷太快看不清</td>
+        <td>
+          别用 <code>-f</code>，改用
+          <code>docker compose logs --tail 100 backend</code>；
+          或直接过滤：<code>docker compose logs --tail 200 backend | grep -i error</code>
+        </td>
+      </tr>
+      <tr>
+        <td>看日志按 <kbd>Ctrl</kbd>+<kbd>C</kbd> 容器会不会停</td>
+        <td>
+          <strong>不会</strong>。只退出日志查看，容器继续运行。
+          只有用 <code>docker compose up</code>（不带 <code>-d</code>）启动时，
+          <kbd>Ctrl</kbd>+<kbd>C</kbd> 才会停止容器
+        </td>
+      </tr>
+      <tr>
+        <td>日志滚动卡住 / 无法回到命令行</td>
+        <td>
+          先按 <kbd>Ctrl</kbd>+<kbd>C</kbd>；若进入了分页模式（<code>less</code>）按 <kbd>q</kbd>；
+          实在不行直接关闭终端窗口，不影响容器
+        </td>
+      </tr>
+      <tr>
+        <td>怎么看某个时间段发生了什么</td>
+        <td>
+          <code>docker compose logs --since 10m backend</code>（最近 10 分钟），
+          也支持 <code>2h</code>、<code>1d</code>
         </td>
       </tr>
     </table>
