@@ -38,6 +38,10 @@
   h1 { font-size: 28px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
   h2 { font-size: 22px; margin-top: 40px; color: #1f2328; border-left: 4px solid var(--primary); padding-left: 12px; }
   h3 { font-size: 17px; margin-top: 28px; }
+  h4 {
+    font-size: 14.5px; margin: 20px 0 8px; color: #1f2328;
+    padding-left: 9px; border-left: 3px solid var(--primary);
+  }
   blockquote {
     margin: 16px 0; padding: 8px 16px; background: #fff8c5;
     border-left: 4px solid #d4a72c; border-radius: 4px; font-size: 14px;
@@ -390,7 +394,77 @@ git revert --continue</code></pre>
   --default-character-set=utf8mb4 coal_sales &lt; backup_20261110_2000.sql</code></pre>
     </div>
 
-    <h3>4.6 进阶：给镜像打版本 tag（回滚秒级完成）</h3>
+    <h3>4.6 用 git tag 标记版本（推荐先做这个）</h3>
+    <div class="highlight">
+      <strong>为什么要打 tag：</strong>commit hash 长得像 <code>b083689</code>，谁也记不住哪个是稳定版。
+      打 tag 就是给某个提交<strong>起个名字</strong>——以后回滚直接
+      <code>git checkout v1.0.0</code>，比翻 hash 清楚一个数量级。
+    </div>
+
+    <h4>① 打 tag（在本地执行）</h4>
+    <pre><code># 方式一：轻量 tag（只是个名字，不推荐）
+git tag v1.0.0
+
+# 方式二：附注 tag（带作者、时间、说明，推荐）
+git tag -a v1.0.0 -m "第一个正式版本：销售/库存/财务/报表全部完成"
+
+# 给历史某个提交补打 tag（不用切过去）
+git tag -a v1.0.0 b083689 -m "补打：第0.9版"</code></pre>
+
+    <h4>② 查看 tag</h4>
+    <pre><code>git tag                      # 列出所有 tag
+git tag -l "v1.*"            # 只看 v1 开头的
+git show v1.0.0              # 看某个 tag 的详情（附注 tag 才有的信息）
+git describe --tags          # 看当前在哪个 tag 附近</code></pre>
+
+    <h4>③ 推送 tag 到远程（<span class="err">必做，否则虚拟机拿不到</span>）</h4>
+    <pre><code>git push origin v1.0.0       # 推单个 tag
+git push --tags              # 推所有未推送的 tag</code></pre>
+    <p class="desc">tag <strong>不会</strong>随普通 <code>git push</code> 一起上去，必须单独推。</p>
+
+    <h4>④ 回滚到某个 tag（服务器上执行）</h4>
+    <pre><code>cd /opt/coal-sales
+git fetch --tags              # 确认能拿到最新 tag 列表
+git tag                       # 看有哪些版本可选
+git checkout v1.0.0           # 切到该版本
+docker compose up -d --build  # 必须重新构建
+docker compose ps</code></pre>
+    <p><strong>回滚完记得回到主线</strong>：</p>
+    <pre><code>git checkout main
+git pull
+docker compose up -d --build</code></pre>
+
+    <h4>⑤ 删除 tag（打错了 / 想收回）</h4>
+    <pre><code>git tag -d v1.0.0                    # 删本地
+git push origin --delete v1.0.0      # 删远程
+git push origin :refs/tags/v1.0.0    # 老版本 git 的写法</code></pre>
+
+    <h4>⑥ 版本号怎么定（语义化版本）</h4>
+    <table>
+      <tr><th>版本号</th><th>什么时候升</th><th>举例</th></tr>
+      <tr><td><code>v1.0.1</code></td><td>只修 bug，不改功能</td><td>修了乱码、修了某个查询报错</td></tr>
+      <tr><td><code>v1.1.0</code></td><td>新增功能，向下兼容</td><td>加了导出 Excel 功能</td></tr>
+      <tr><td><code>v2.0.0</code></td><td>不兼容的大改动</td><td>重构表结构、改了接口约定</td></tr>
+    </table>
+    <p class="desc">格式：<code>主版本.次版本.修订号</code>。个人项目不必严格，但<strong>别用同一版本号覆盖两次</strong>。</p>
+
+    <div class="highlight">
+      <strong>推荐的上线流程：</strong>
+      <pre><code># 本地
+git add . &amp;&amp; git commit -m "完成xxx功能"
+git tag -a v1.1.0 -m "新增导出功能"
+git push &amp;&amp; git push --tags
+
+# 服务器
+cd /opt/coal-sales
+git pull
+git fetch --tags
+docker compose up -d --build
+docker compose ps</code></pre>
+      <p class="desc">先打 tag 再改代码，这样每个能跑起来的版本都有名字可回退。</p>
+    </div>
+
+    <h3>4.7 进阶：给镜像打版本 tag（回滚秒级完成）</h3>
     <p>现在镜像是 <code>coal-sales-backend:latest</code>，每次 <code>--build</code> <strong>原地覆盖</strong>，旧版本就没了。
       改成打版本 tag 后，回滚只需改一行配置：</p>
     <pre><code># docker-compose.yml
@@ -415,7 +489,7 @@ docker compose up -d          # 几秒钟，不用重新编译</code></pre>
     </table>
     <p class="desc">个人项目用「git + 重新构建」已足够，项目正式上线后再考虑这个方案。</p>
 
-    <h3>4.7 速查表</h3>
+    <h3>4.8 速查表</h3>
     <table>
       <tr><th>场景</th><th>命令</th></tr>
       <tr><td>更新到最新</td><td><code>git pull</code> + <code>docker compose up -d --build</code></td></tr>
@@ -424,6 +498,11 @@ docker compose up -d          # 几秒钟，不用重新编译</code></pre>
       <tr><td>永久撤销某版本</td><td>本地 <code>git revert &lt;hash&gt;</code> → <code>push</code> → 服务器 <code>pull</code></td></tr>
       <tr><td>看改了什么</td><td><code>git diff &lt;旧&gt; &lt;新&gt; --stat</code></td></tr>
       <tr><td>回滚前备份库</td><td><code>mysqldump ... &gt; backup_日期.sql</code></td></tr>
+      <tr><td>打版本 tag</td><td><code>git tag -a v1.0.0 -m "说明"</code></td></tr>
+      <tr><td>推 tag 到远程</td><td><code>git push origin v1.0.0</code> 或 <code>git push --tags</code></td></tr>
+      <tr><td>看有哪些 tag</td><td><code>git tag</code> / <code>git tag -l "v1.*"</code></td></tr>
+      <tr><td>按 tag 回滚</td><td><code>git checkout v1.0.0</code> + <code>up -d --build</code></td></tr>
+      <tr><td>删 tag</td><td><code>git tag -d v1.0.0</code> + <code>git push origin --delete v1.0.0</code></td></tr>
     </table>
 
     <h2 id="logs">五、查看状态与日志</h2>
@@ -706,6 +785,28 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
         <td>
           <code>docker compose exec -T mysql mysqldump -uroot -p123456 --default-character-set=utf8mb4 coal_sales &gt; backup_日期.sql</code>，
           建议大版本上线前执行
+        </td>
+      </tr>
+      <tr>
+        <td>怎么给版本起名字，方便以后回滚</td>
+        <td>
+          <code>git tag -a v1.0.0 -m "版本说明"</code> →
+          <code>git push origin v1.0.0</code>。
+          以后直接 <code>git checkout v1.0.0</code> 回滚，详见 4.6
+        </td>
+      </tr>
+      <tr>
+        <td>tag 打了，但虚拟机里 <code>git tag</code> 看不到</td>
+        <td>
+          忘了推 tag（tag <strong>不会</strong>随 <code>git push</code> 自动上去）。
+          本地执行 <code>git push --tags</code>，服务器执行 <code>git fetch --tags</code>
+        </td>
+      </tr>
+      <tr>
+        <td>tag 打完发现打错了，怎么撤销</td>
+        <td>
+          <code>git tag -d v1.0.0</code> 删本地 →
+          <code>git push origin --delete v1.0.0</code> 删远程
         </td>
       </tr>
     </table>
