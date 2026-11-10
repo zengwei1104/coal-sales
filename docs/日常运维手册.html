@@ -57,6 +57,14 @@
   .tag.info { background: #ddf4ff; color: #0969da; }
   .tag.ok { background: #dafbe1; color: #1a7f37; }
   .step { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .step h3 { margin-top: 0; font-size: 15px; }
+  .step h4 {
+    margin: 18px 0 6px; font-size: 14px; color: #1f2328;
+    padding-left: 9px; border-left: 3px solid var(--primary);
+  }
+  .step h4:first-child { margin-top: 0; }
+  .step p + pre { margin-top: 8px; }
+  .highlight pre { margin: 8px 0 4px; }
   .cmd-card {
     background: #fff; border: 1px solid var(--border); border-radius: 8px;
     padding: 18px 20px; margin: 14px 0;
@@ -88,7 +96,7 @@
     <a href="#overview">一、系统概览</a>
     <a href="#daily">二、日常启动 / 关闭 / 重启</a>
     <a href="#boot">三、虚拟机关机与开机自启</a>
-    <a href="#update">四、更新代码后重新部署</a>
+    <a href="#update">四、更新代码与版本回滚</a>
     <a href="#logs">五、查看状态与日志</a>
     <a href="#quick">六、命令速查表</a>
     <a href="#faq">七、常见问题</a>
@@ -247,16 +255,176 @@
       只有真正想临时停服时，才用 <code>docker compose stop</code>。
     </p>
 
-    <h2 id="update">四、更新代码后重新部署</h2>
-    <p>改了代码并 push 到远程仓库后，在虚拟机里这样更新：</p>
+    <h2 id="update">四、更新代码与版本回滚</h2>
+
+    <div class="highlight">
+      <strong>核心原则：</strong>回滚 = <strong>代码回退 + 重新构建 + 验证</strong> 三步。
+      镜像里存的是<strong>编译好的 jar 包和前端静态文件</strong>，光回滚源码不重新构建，
+      跑的还是旧镜像。<strong>任何代码变动（更新或回滚），都必须加 <code>--build</code>。</strong>
+    </div>
+
+    <h3>4.1 更新到最新版本（最常用）</h3>
     <div class="step">
-      <h3>1. 拉取最新代码</h3>
+      <p>本地改完代码并 push 到远程仓库后，在虚拟机里这样更新：</p>
       <pre><code>cd /opt/coal-sales
-git pull</code></pre>
-      <h3>2. 重新编译 + 启动</h3>
-      <pre><code>docker compose up -d --build</code></pre>
+git pull                      # 拉取最新代码
+docker compose up -d --build  # 必须加 --build，重新编译
+docker compose ps             # 验证三个容器都 Up</code></pre>
       <p><code>--build</code> 会重新执行 Dockerfile 编译代码，<strong>改了代码就必须加这个参数</strong>，否则会用旧镜像。</p>
     </div>
+
+    <h3>4.2 先分清：临时回滚 vs 永久回滚</h3>
+    <table>
+      <tr><th>类型</th><th>做法</th><th>适用场景</th><th>特点</th></tr>
+      <tr>
+        <td><strong>临时回滚</strong><br>（应急止血）</td>
+        <td>服务器上直接切到旧 commit</td>
+        <td>线上出问题，先恢复服务</td>
+        <td>快，但下次 <code>git pull</code> 会回到新版</td>
+      </tr>
+      <tr>
+        <td><strong>永久回滚</strong><br>（正式撤销）</td>
+        <td>本地 <code>git revert</code> 后 push</td>
+        <td>确认那个版本就是错的</td>
+        <td>历史完整，远程分支同步</td>
+      </tr>
+    </table>
+    <p>线上出事时，<strong>先用临时回滚止血，再慢慢做永久回滚</strong>。</p>
+
+    <h3>4.3 临时回滚（线上出问题应急用）</h3>
+    <div class="step">
+      <h4>第 1 步：找到要回到哪个版本</h4>
+      <pre><code>cd /opt/coal-sales
+git log --oneline -10</code></pre>
+      <p>输出形如：</p>
+      <pre><code>747ddde 运维手册补充：日志查看技巧
+d7bd802 排查记录补充：中文乱码
+b083689 修复中文乱码：SET NAMES utf8mb4   ← 假设这个版本是好的</code></pre>
+
+      <h4>第 2 步：切到那个版本</h4>
+      <pre><code>git checkout b083689</code></pre>
+      <p class="desc">会提示 <code>You are in 'detached HEAD' state</code>，这是<strong>正常提示</strong>，不用管。</p>
+
+      <h4>第 3 步：重新构建并启动</h4>
+      <pre><code>docker compose up -d --build
+docker compose ps</code></pre>
+
+      <h4>第 4 步：验证服务已恢复</h4>
+      <pre><code>docker compose logs --tail 50 backend | grep -E "Started|ERROR"</code></pre>
+      <p>看到 <code>Started CoalSalesApplication</code> 就说明恢复了。</p>
+    </div>
+
+    <div class="highlight">
+      <strong>注意：临时回滚不是永久的。</strong>
+      之后执行 <code>git pull</code> 会因 HEAD 不在分支上而报错。
+      要回到最新版需先执行：
+      <pre><code>git checkout main
+git pull
+docker compose up -d --build</code></pre>
+    </div>
+
+    <h3>4.4 永久回滚（正式撤销某个版本）</h3>
+    <div class="highlight">
+      <strong class="err">不要</strong>在服务器上 <code>git reset --hard</code> 后 <code>push -f</code> —
+      这会改写远程历史，以后难以追溯。<strong>用 <code>revert</code>，它生成反向提交，历史完整保留。</strong>
+    </div>
+    <div class="step">
+      <h4>在本地（Windows）执行</h4>
+      <pre><code>cd "C:/Users/zengwei/Desktop/Spring Boot Web 煤炭销售管理系统"
+
+# 1. 查看提交，找到有问题的那个
+git log --oneline -5
+
+# 2. 撤销指定提交（生成一个新的反向提交）
+git revert &lt;有问题的commit-hash&gt;
+
+# 撤多个连续提交（比如最近 2 个）
+git revert --no-commit HEAD~2..HEAD
+git commit -m "回滚：撤销xxx版本"
+
+# 3. 推送
+git push origin main</code></pre>
+      <h4>在服务器重新部署</h4>
+      <pre><code>cd /opt/coal-sales
+git pull
+docker compose up -d --build
+docker compose ps</code></pre>
+    </div>
+    <p><strong>如果 revert 遇到冲突</strong>（后面的提交改过同一行）：手动编辑冲突文件，删掉
+      <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> / <code>=======</code> / <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> 标记，然后：</p>
+    <pre><code>git add &lt;冲突文件&gt;
+git revert --continue</code></pre>
+
+    <h3>4.5 最大的坑：数据库回滚不了</h3>
+    <p>这是新手最容易栽的地方。<code>git</code> 只管代码，<strong>数据库结构变化它一概不管</strong>。</p>
+    <table>
+      <tr><th>情况</th><th>回滚后会不会出问题</th></tr>
+      <tr>
+        <td>新版本<strong>新增</strong>了字段，你回滚到旧代码</td>
+        <td>✅ 旧代码不认识新字段，通常不报错</td>
+      </tr>
+      <tr>
+        <td>新版本<strong>删除/改名</strong>了字段，你回滚到旧代码</td>
+        <td class="err">❌ 旧代码查这个字段 → <code>Unknown column</code> → 后端启动失败</td>
+      </tr>
+    </table>
+
+    <p><strong>回滚前先确认这次改动动没动数据库：</strong></p>
+    <pre><code>git diff &lt;好版本&gt; &lt;坏版本&gt; --stat -- sql/</code></pre>
+    <p>没输出 → 只动了代码，放心回滚；有输出 → 需要手动处理数据库。</p>
+
+    <p><strong>数据库回滚只有两条路：</strong></p>
+    <table>
+      <tr><th>方式</th><th>做法</th><th>前提</th></tr>
+      <tr><td>从备份恢复</td><td><code>mysqldump</code> 导回</td><td>上线前做过备份</td></tr>
+      <tr><td>手动反向 SQL</td><td>自己写 <code>ALTER TABLE</code> 撤销</td><td>记得改了什么</td></tr>
+    </table>
+
+    <div class="highlight">
+      <strong>所以：大版本上线前先备份数据库。</strong>
+      <pre><code>docker compose exec -T mysql mysqldump -uroot -p123456 \
+  --default-character-set=utf8mb4 coal_sales \
+  &gt; backup_$(date +%Y%m%d_%H%M).sql</code></pre>
+      <p class="desc">备份文件会落在 <code>/opt/coal-sales/</code> 目录下。恢复时：</p>
+      <pre><code>docker compose exec -T mysql mysql -uroot -p123456 \
+  --default-character-set=utf8mb4 coal_sales &lt; backup_20261110_2000.sql</code></pre>
+    </div>
+
+    <h3>4.6 进阶：给镜像打版本 tag（回滚秒级完成）</h3>
+    <p>现在镜像是 <code>coal-sales-backend:latest</code>，每次 <code>--build</code> <strong>原地覆盖</strong>，旧版本就没了。
+      改成打版本 tag 后，回滚只需改一行配置：</p>
+    <pre><code># docker-compose.yml
+services:
+  backend:
+    image: coal-sales-backend:v1.2
+  web:
+    image: coal-sales-web:v1.2</code></pre>
+    <pre><code># 部署某版本
+docker compose build
+docker tag coal-sales-backend coal-sales-backend:v1.2
+docker compose up -d
+
+# 回滚：把 compose 里的 v1.2 改成 v1.1，然后
+docker compose up -d          # 几秒钟，不用重新编译</code></pre>
+    <table>
+      <tr><th>优点</th><th>缺点</th></tr>
+      <tr>
+        <td>回滚秒级完成、不依赖网络和编译、不受源码状态影响</td>
+        <td>要养成手动打 tag 的习惯、镜像占磁盘空间</td>
+      </tr>
+    </table>
+    <p class="desc">个人项目用「git + 重新构建」已足够，项目正式上线后再考虑这个方案。</p>
+
+    <h3>4.7 速查表</h3>
+    <table>
+      <tr><th>场景</th><th>命令</th></tr>
+      <tr><td>更新到最新</td><td><code>git pull</code> + <code>docker compose up -d --build</code></td></tr>
+      <tr><td>应急回滚</td><td><code>git checkout &lt;旧commit&gt;</code> + <code>up -d --build</code></td></tr>
+      <tr><td>从回滚状态恢复</td><td><code>git checkout main</code> + <code>git pull</code> + <code>up -d --build</code></td></tr>
+      <tr><td>永久撤销某版本</td><td>本地 <code>git revert &lt;hash&gt;</code> → <code>push</code> → 服务器 <code>pull</code></td></tr>
+      <tr><td>看改了什么</td><td><code>git diff &lt;旧&gt; &lt;新&gt; --stat</code></td></tr>
+      <tr><td>回滚前备份库</td><td><code>mysqldump ... &gt; backup_日期.sql</code></td></tr>
+    </table>
 
     <h2 id="logs">五、查看状态与日志</h2>
     <div class="cmd-card">
@@ -368,6 +536,12 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
       <tr><td>查看状态</td><td><code>docker compose ps</code></td><td>看是否 running</td></tr>
       <tr><td>查看日志</td><td><code>docker compose logs -f 服务名</code></td><td>实时滚动</td></tr>
       <tr><td>确认 Docker 开机自启</td><td><code>systemctl is-enabled docker</code></td><td>应输出 enabled</td></tr>
+      <tr><td>更新代码</td><td><code>git pull</code> + <code>up -d --build</code></td><td>改了代码必须重建</td></tr>
+      <tr><td>查看提交历史</td><td><code>git log --oneline -10</code></td><td>找要回滚到哪个版本</td></tr>
+      <tr><td>临时回滚</td><td><code>git checkout &lt;hash&gt;</code> + <code>up -d --build</code></td><td>应急止血，非永久</td></tr>
+      <tr><td>退出临时回滚</td><td><code>git checkout main</code> + <code>git pull</code></td><td>回到最新版</td></tr>
+      <tr><td>永久撤销某版本</td><td><code>git revert &lt;hash&gt;</code> → <code>push</code></td><td>本地执行，生成反向提交</td></tr>
+      <tr><td>备份数据库</td><td><code>mysqldump ... &gt; backup_日期.sql</code></td><td>大版本上线前必做</td></tr>
     </table>
 
     <h3>6.1 五个容易混淆的命令对比</h3>
@@ -487,6 +661,51 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
         <td>
           <code>docker compose logs --since 10m backend</code>（最近 10 分钟），
           也支持 <code>2h</code>、<code>1d</code>
+        </td>
+      </tr>
+      <tr>
+        <td>新版本有问题，怎么快速回到上一个版本</td>
+        <td>
+          <code>git log --oneline -10</code> 找到好版本的 hash →
+          <code>git checkout &lt;hash&gt;</code> →
+          <code>docker compose up -d --build</code>。
+          这是<strong>临时</strong>回滚，详见 4.3
+        </td>
+      </tr>
+      <tr>
+        <td>回滚后 <code>git pull</code> 报错 "not currently on a branch"</td>
+        <td>
+          因为处于 detached HEAD 状态。执行
+          <code>git checkout main</code> → <code>git pull</code> → <code>up -d --build</code> 即可回到最新版
+        </td>
+      </tr>
+      <tr>
+        <td>怎么彻底撤销某个错误版本</td>
+        <td>
+          本地 <code>git revert &lt;hash&gt;</code> 生成反向提交 → <code>push</code> →
+          服务器 <code>git pull</code> + <code>up -d --build</code>。
+          <strong>不要用 <code>reset --hard</code> + <code>push -f</code></strong>，详见 4.4
+        </td>
+      </tr>
+      <tr>
+        <td>回滚代码后后端启动报 <code>Unknown column</code></td>
+        <td class="err">
+          数据库结构没跟着回滚。数据库不受 git 管理，
+          需从备份恢复或手动执行反向 SQL，详见 4.5
+        </td>
+      </tr>
+      <tr>
+        <td>回滚后页面还是新的 / 没生效</td>
+        <td>
+          忘了加 <code>--build</code>。镜像里是旧的编译产物，
+          改任何代码（更新或回滚）都必须重新构建
+        </td>
+      </tr>
+      <tr>
+        <td>怎么备份数据库</td>
+        <td>
+          <code>docker compose exec -T mysql mysqldump -uroot -p123456 --default-character-set=utf8mb4 coal_sales &gt; backup_日期.sql</code>，
+          建议大版本上线前执行
         </td>
       </tr>
     </table>
