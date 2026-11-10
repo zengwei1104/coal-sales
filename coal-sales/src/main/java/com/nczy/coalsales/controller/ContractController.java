@@ -31,14 +31,14 @@ public class ContractController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String keyword,
             @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES,RoleConstant.FINANCE);
         return Result.success(contractService.pageContract(current, size, status, keyword));
     }
 
     @GetMapping("/{id}")
     public Result<Contract> getContract(@PathVariable Long id,
                                         @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES,RoleConstant.FINANCE);
         return Result.success(contractService.getContract(id));
     }
 
@@ -80,7 +80,7 @@ public class ContractController {
                               @RequestBody Map<String, Object> body,
                               @AuthenticationPrincipal LoginUser loginUser) {
         // 审核只允许销售经理（需求：销售经理负责合同审核）
-        AuthUtil.checkRole(loginUser, RoleConstant.MANAGER);
+        AuthUtil.checkRole(loginUser, RoleConstant.MANAGER,RoleConstant.SALES);
         boolean pass = Boolean.TRUE.equals(body.get("pass"));
         String opinion = (String) body.get("opinion");
         contractService.audit(id, pass, opinion, loginUser);

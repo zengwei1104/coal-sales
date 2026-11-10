@@ -35,14 +35,14 @@ public class SaleOrderController {
             @RequestParam(required = false) Long contractId,
             @RequestParam(required = false) String keyword,
             @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES,RoleConstant.WEIGHMAN);
         return Result.success(saleOrderService.pageOrder(current, size, status, customerId, contractId, keyword));
     }
 
     @GetMapping("/{id}")
     public Result<SaleOrder> getOrder(@PathVariable Long id,
                                       @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES,RoleConstant.WEIGHMAN);
         return Result.success(saleOrderService.getOrder(id, loginUser));
     }
 

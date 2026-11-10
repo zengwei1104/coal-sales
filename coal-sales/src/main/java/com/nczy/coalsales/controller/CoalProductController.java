@@ -26,7 +26,7 @@ public class CoalProductController {
     public Result<PageResult<CoalProduct>> page(@RequestParam(defaultValue = "1") Long current,
                                                 @RequestParam(defaultValue = "10") Long size,
                                                 @AuthenticationPrincipal LoginUser loginUser){
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN,RoleConstant.STOCK);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN,RoleConstant.STOCK,RoleConstant.SALES,RoleConstant.MANAGER);
         return Result.success(coalProductService.pageCoalProduct(current,size));
     }
 
@@ -58,7 +58,7 @@ public class CoalProductController {
     @GetMapping("/{id}")
     public Result<CoalProduct> getCoalProduct(@PathVariable("id") long id,
                                               @AuthenticationPrincipal LoginUser loginUser){
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN,RoleConstant.STOCK,RoleConstant.SALES,RoleConstant.MANAGER);
         CoalProduct product = coalProductService.getById(id);
         if (product == null) {
             return Result.error("商品不存在或已被删除");

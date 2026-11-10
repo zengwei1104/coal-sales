@@ -30,7 +30,7 @@ public class CustomerController {
       public Result<PageResult<Customer>> page(@RequestParam(defaultValue = "1") Long current,
                                                @RequestParam(defaultValue = "10") Long size,
                                                @AuthenticationPrincipal LoginUser loginUser){
-          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER);
+          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER,RoleConstant.FINANCE,RoleConstant.SALES);
           return Result.success(customerService.pageCustomer(current,size));
       }
 
@@ -51,15 +51,14 @@ public class CustomerController {
       @GetMapping("/{id}/receivable")
       public Result<BigDecimal> getReceivable(@PathVariable("id") Long id,
                                               @AuthenticationPrincipal LoginUser loginUser) {
-          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER,
-                  RoleConstant.SALES, RoleConstant.FINANCE);
+          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES, RoleConstant.FINANCE);
           return Result.success(paymentService.getReceivable(id));
       }
 
       @GetMapping("/{id}")
       public  Result<Customer> getCustomer(@PathVariable("id") long id,
                                            @AuthenticationPrincipal LoginUser loginUser){
-          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+          AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES,RoleConstant.FINANCE);
         return Result.success("查询成功",customerService.getCustomer(id));
       }
       @PutMapping("/{id}")

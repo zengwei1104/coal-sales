@@ -24,7 +24,6 @@ public class CoalProductServiceImpl extends ServiceImpl<CoalProductMapper, CoalP
                 new Page<>(current,size),
                 new LambdaQueryWrapper<CoalProduct>().orderByDesc(CoalProduct::getCreateTime) //mybatisplus提供的查询条件
         );
-
         return PageResult.of(page);
     }
 

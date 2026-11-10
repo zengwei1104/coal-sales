@@ -37,7 +37,7 @@ public class PaymentController {
     @PostMapping
     public Result<Long> create(@RequestBody @Valid PaymentCreateDTO dto,
                                @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.FINANCE);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN,RoleConstant.FINANCE);
         Long paymentId = paymentService.createPayment(dto);
         return Result.success("登记回款成功", paymentId);
     }
@@ -46,7 +46,7 @@ public class PaymentController {
     public Result<Void> writeOff(@PathVariable Long id,
                                  @RequestBody @Valid PaymentWriteOffDTO dto,
                                  @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.FINANCE);
+        AuthUtil.checkRole(loginUser,RoleConstant.ADMIN, RoleConstant.FINANCE);
         paymentService.writeOff(id, dto);
         return Result.success("核销成功", null);
     }
