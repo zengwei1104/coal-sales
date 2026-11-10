@@ -101,9 +101,10 @@
     <a href="#daily">二、日常启动 / 关闭 / 重启</a>
     <a href="#boot">三、虚拟机关机与开机自启</a>
     <a href="#update">四、更新代码与版本回滚</a>
-    <a href="#logs">五、查看状态与日志</a>
-    <a href="#quick">六、命令速查表</a>
-    <a href="#faq">七、常见问题</a>
+    <a href="#release">五、安全发布流程</a>
+    <a href="#logs">六、查看状态与日志</a>
+    <a href="#quick">七、命令速查表</a>
+    <a href="#faq">八、常见问题</a>
   </nav>
 
   <main>
@@ -505,14 +506,134 @@ docker compose up -d          # 几秒钟，不用重新编译</code></pre>
       <tr><td>删 tag</td><td><code>git tag -d v1.0.0</code> + <code>git push origin --delete v1.0.0</code></td></tr>
     </table>
 
-    <h2 id="logs">五、查看状态与日志</h2>
+    <h2 id="release">五、安全发布流程（更新 + 可回退）</h2>
+
+    <div class="highlight">
+      <strong>核心原则：</strong>回退点必须在<strong>更新之前</strong>建好，不是出了问题再去历史里翻。
+    </div>
+
+    <h3>5.1 常见的错误做法</h3>
+    <table>
+      <tr><th>做法</th><th>后果</th></tr>
+      <tr>
+        <td class="err">先 <code>git pull</code> 更新 → 发现 bug → 回头找哪个版本是好的</td>
+        <td class="err">历史里十几个 commit，认不出哪个稳定，只能瞎试</td>
+      </tr>
+      <tr>
+        <td>更新前先给当前版本打 tag，再部署</td>
+        <td>✅ 出问题 <code>checkout v1.0.0</code> 一条命令退回去</td>
+      </tr>
+    </table>
+
+    <h3>5.2 完整六步流程</h3>
+
+    <div class="step">
+      <h4>第 0 步：更新前，把当前版本钉住（最关键）</h4>
+      <pre><code>cd /opt/coal-sales
+git status                    # 确认工作区干净
+git log --oneline -3          # 看当前在哪个提交
+git tag                       # 看已有哪些 tag</code></pre>
+      <p>当前版本还没有 tag 的话，现在补一个：</p>
+      <pre><code>git tag -a v1.0.0 -m "更新前确认稳定的版本"
+git push origin v1.0.0        # tag 必须单独推</code></pre>
+      <p class="desc"><code>git status</code> 若有改动，说明服务器上被手动改过文件，先搞清楚再继续（正常 clone 的部署目录应当是干净的）。</p>
+    </div>
+
+    <div class="step">
+      <h4>第 1 步：涉及 SQL 改动时，先备份数据库</h4>
+      <pre><code>docker compose exec -T mysql mysqldump -uroot -p123456 \
+  --default-character-set=utf8mb4 coal_sales \
+  &gt; backup_before_v1.1.0.sql
+ls -lh backup_before_v1.1.0.sql   # 确认文件有内容</code></pre>
+      <p><strong>怎么判断涉不涉及 SQL：</strong></p>
+      <pre><code>git diff v1.0.0 origin/main --stat -- sql/</code></pre>
+      <p class="desc">有输出 → 动了库，必须备份；无输出 → 只改代码，可跳过备份。</p>
+    </div>
+
+    <div class="step">
+      <h4>第 2 步：部署新版本</h4>
+      <pre><code>git pull
+docker compose up -d --build</code></pre>
+    </div>
+
+    <div class="step">
+      <h4>第 3 步：验证（不要跳过）</h4>
+      <pre><code>docker compose ps                                          # 三个容器都 Up
+docker compose logs --tail 50 backend | grep -E "Started|ERROR"</code></pre>
+      <p>然后打开浏览器点几个关键页面：登录、客户列表、销售单、报表。</p>
+    </div>
+
+    <div class="step">
+      <h4>第 4 步：发现问题 → 回退</h4>
+      <pre><code>git fetch --tags              # 确保本地有 v1.0.0
+git checkout v1.0.0
+docker compose up -d --build  # 必须重建，镜像里是编译产物
+docker compose ps
+docker compose logs --tail 30 backend | grep "Started"</code></pre>
+      <p>如果数据库也被新版本改坏了，再恢复备份：</p>
+      <pre><code>docker compose exec -T mysql mysql -uroot -p123456 \
+  --default-character-set=utf8mb4 coal_sales &lt; backup_before_v1.1.0.sql</code></pre>
+    </div>
+
+    <div class="step">
+      <h4>第 5 步：确认稳定后，给新版本也打 tag</h4>
+      <pre><code>git checkout main             # 先脱离 tag 状态回到主线
+git pull
+git tag -a v1.1.0 -m "新增xxx功能"
+git push origin v1.1.0</code></pre>
+    </div>
+
+    <h3>5.3 时间线示意</h3>
+    <table>
+      <tr><th>时刻</th><th>服务器状态</th><th>你能回到哪</th></tr>
+      <tr><td>更新前</td><td><code>main</code> @ 旧提交，已打 <code>v1.0.0</code></td><td>随时 <code>checkout v1.0.0</code></td></tr>
+      <tr><td>更新后正常</td><td><code>main</code> @ 新提交</td><td><code>v1.0.0</code> 仍可退</td></tr>
+      <tr><td>更新后出 bug</td><td>任意状态</td><td><code>checkout v1.0.0</code> + <code>--build</code>，2~3 分钟恢复</td></tr>
+      <tr><td>确认稳定</td><td>新版本打上 <code>v1.1.0</code></td><td>两个回退点都在</td></tr>
+    </table>
+
+    <h3>5.4 三个必踩的坑</h3>
+    <table>
+      <tr><th>坑</th><th>说明</th><th>怎么避</th></tr>
+      <tr>
+        <td class="err"><strong>坑 1</strong><br>本地改动没提交就发布</td>
+        <td>服务器 <code>git pull</code> 只拿远程代码，本地未 commit 的改动<strong>不会</strong>过去</td>
+        <td>发布前先 <code>git status</code>，有改动就 <code>add</code> + <code>commit</code> + <code>push</code></td>
+      </tr>
+      <tr>
+        <td class="err"><strong>坑 2</strong><br>tag 不会自动同步</td>
+        <td><code>git push</code> <strong>不推</strong> tag</td>
+        <td>本地 <code>git push origin v1.0.0</code>，服务器 <code>git fetch --tags</code></td>
+      </tr>
+      <tr>
+        <td class="err"><strong>坑 3</strong><br>回退忘了 <code>--build</code></td>
+        <td>镜像里是上一次编译好的 jar 和静态文件，只切源码不重建 = 没退</td>
+        <td>任何代码变动（更新或回退）都加 <code>--build</code></td>
+      </tr>
+    </table>
+
+    <h3>5.5 一行速记</h3>
+    <pre><code>打 tag → 备份库 → git pull → up -d --build → 验证
+                                      ↓ 出问题
+                        git checkout v1.0.0 → up -d --build</code></pre>
+
+    <h3>5.6 想让回退更快（可选）</h3>
+    <p>回退时 <code>--build</code> 有缓存，一般 1~3 分钟。想秒级回退，可在<strong>更新前</strong>把当前镜像存一份：</p>
+    <pre><code># 更新前执行
+docker tag coal-sales-backend coal-sales-backend:v1.0.0
+docker tag coal-sales-web coal-sales-web:v1.0.0</code></pre>
+    <p>回退时把 <code>docker-compose.yml</code> 里两个服务的 <code>image:</code> 指向 <code>:v1.0.0</code>，然后：</p>
+    <pre><code>docker compose up -d          # 不带 --build，几秒钟完成</code></pre>
+    <p class="desc">当前项目用的是 <code>build:</code> 方式，属于进阶优化，需要时再改配置。</p>
+
+    <h2 id="logs">六、查看状态与日志</h2>
     <div class="cmd-card">
       <h4>📋 查看容器状态</h4>
       <p class="desc">三个容器都应显示 <code>running</code>（或 Up）。</p>
       <pre><code>docker compose ps</code></pre>
     </div>
 
-    <h3>5.1 两种看日志的方式</h3>
+    <h3>6.1 两种看日志的方式</h3>
     <table>
       <tr><th>方式</th><th>命令</th><th>特点</th><th>适用场景</th></tr>
       <tr>
@@ -535,7 +656,7 @@ docker compose up -d          # 几秒钟，不用重新编译</code></pre>
       <code>--tail 50</code> 是一次性输出完整一段日志，更容易定位异常。
     </div>
 
-    <h3>5.2 常用日志命令</h3>
+    <h3>6.2 常用日志命令</h3>
     <div class="cmd-card">
       <h4>📄 看最后 N 行（最常用）</h4>
       <pre><code>docker compose logs --tail 50 backend   # 后端最后 50 行
@@ -562,7 +683,7 @@ docker compose logs mysql        # 只看数据库
 docker compose logs web          # 只看前端</code></pre>
     </div>
 
-    <h3>5.3 怎么退出日志查看</h3>
+    <h3>6.3 怎么退出日志查看</h3>
     <table>
       <tr><th>当前状态</th><th>退出方式</th><th>容器会怎样</th></tr>
       <tr>
@@ -588,7 +709,7 @@ docker compose logs web          # 只看前端</code></pre>
       此时看日志按 <kbd>Ctrl</kbd>+<kbd>C</kbd> 只是退出查看，<strong>容器不受任何影响</strong>。
     </div>
 
-    <h3>5.4 判断后端是否启动成功</h3>
+    <h3>6.4 判断后端是否启动成功</h3>
     <p>看后端日志，<strong>出现下面两行</strong>才算真的起来了：</p>
     <pre><code>Tomcat started on port 8080
 Started CoalSalesApplication in x.xxx seconds</code></pre>
@@ -601,7 +722,7 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
       <tr><td class="err"><code>Application run failed</code></td><td>启动过程报错，往上翻找第一个 Exception</td></tr>
     </table>
 
-    <h2 id="quick">六、命令速查表</h2>
+    <h2 id="quick">七、命令速查表</h2>
     <table>
       <tr><th>操作</th><th>命令</th><th>说明</th></tr>
       <tr><td>进入目录</td><td><code>cd /opt/coal-sales</code></td><td>所有命令前先执行</td></tr>
@@ -623,7 +744,7 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
       <tr><td>备份数据库</td><td><code>mysqldump ... &gt; backup_日期.sql</code></td><td>大版本上线前必做</td></tr>
     </table>
 
-    <h3>6.1 五个容易混淆的命令对比</h3>
+    <h3>7.1 五个容易混淆的命令对比</h3>
     <table>
       <tr><th>命令</th><th>是否重新编译</th><th>容器</th><th>数据</th><th>典型场景</th></tr>
       <tr>
@@ -670,7 +791,7 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
       </tr>
     </table>
 
-    <h2 id="faq">七、常见问题</h2>
+    <h2 id="faq">八、常见问题</h2>
     <table>
       <tr><th>问题</th><th>排查 / 解决</th></tr>
       <tr><td>提示「找不到 docker-compose.yml」</td><td>没进对目录，先 <code>cd /opt/coal-sales</code></td></tr>
@@ -749,6 +870,13 @@ Started CoalSalesApplication in x.xxx seconds</code></pre>
           <code>git checkout &lt;hash&gt;</code> →
           <code>docker compose up -d --build</code>。
           这是<strong>临时</strong>回滚，详见 4.3
+        </td>
+      </tr>
+      <tr>
+        <td>怎么安全地更新版本，出问题又能退回来</td>
+        <td>
+          更新<strong>前</strong>先打 tag 钉住当前稳定版，再备份库、部署、验证。
+          完整六步流程见 <strong>5.2</strong>
         </td>
       </tr>
       <tr>
