@@ -34,10 +34,22 @@ public class ContractServiceImpl extends ServiceImpl<ContractMapper, Contract>
     }
     private String genContractNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        // 简单流水：查当天已有多少条 +1；并发场景建议改用数据库唯一约束兜底重试
-        long count = count(new LambdaQueryWrapper<Contract>()
-                .likeRight(Contract::getContractNo, "HT" + date));
-        return "HT" + date + String.format("%03d", count + 1);
+        String prefix = "HT" + date;
+        String maxNo = baseMapper.selectMaxContractNo(prefix);
+        int nextSeq = nextSeq(maxNo, prefix);
+        return prefix + String.format("%03d", nextSeq);
+    }
+
+    // 从当天最大编号解析流水号并 +1，无记录则从 1 开始
+    private int nextSeq(String maxNo, String prefix) {
+        if (maxNo != null && maxNo.startsWith(prefix) && maxNo.length() > prefix.length()) {
+            try {
+                return Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 编号格式异常时回退为 1
+            }
+        }
+        return 1;
     }
     // ============ 归属校验 ============
     private void checkOwner(Contract contract, LoginUser loginUser) {

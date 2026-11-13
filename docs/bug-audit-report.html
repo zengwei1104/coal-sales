@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="煤炭销售管理系统 Bug 静态检查报告，包含严重等级排序、问题定位、修复建议与 Redis 并发方案评估。">
+  <title>煤炭销售管理系统 · Bug 检查报告</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --primary: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --p0: #b91c1c;
+      --p0-soft: #fef2f2;
+      --p1: #c2410c;
+      --p1-soft: #fff7ed;
+      --p2: #a16207;
+      --p2-soft: #fefce8;
+      --p3: #0369a1;
+      --p3-soft: #f0f9ff;
+      --success: #047857;
+      --success-soft: #ecfdf5;
+      --code: #0f172a;
+      --shadow: 0 12px 36px rgba(15, 23, 42, 0.07);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+    }
+    a { color: inherit; }
+    code {
+      padding: 2px 6px;
+      border: 1px solid #dbe3ee;
+      border-radius: 5px;
+      background: #f1f5f9;
+      color: var(--code);
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 0.9em;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      margin: 14px 0 0;
+      padding: 18px 20px;
+      overflow-x: auto;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font: 13px/1.7 Consolas, "SFMono-Regular", monospace;
+    }
+    pre code { padding: 0; border: 0; background: none; color: inherit; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 58px 24px 50px;
+      background: linear-gradient(135deg, #122554 0%, #1e40af 58%, #0369a1 100%);
+      color: #fff;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      right: -110px;
+      top: -190px;
+      border: 70px solid rgba(255, 255, 255, 0.06);
+      border-radius: 50%;
+    }
+    .hero-inner, .container { width: min(1120px, 100%); margin: 0 auto; }
+    .hero-inner { position: relative; z-index: 1; }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #bfdbfe;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 42px); line-height: 1.3; letter-spacing: -0.02em; }
+    .subtitle { max-width: 760px; margin: 16px 0 24px; color: #dbeafe; font-size: 16px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; }
+    .meta span {
+      padding: 5px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #eff6ff;
+      font-size: 13px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 28px;
+      padding-top: 30px;
+      padding-bottom: 56px;
+    }
+    .toc { position: sticky; top: 24px; align-self: start; padding: 18px; }
+    .card {
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .toc-title { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+    .toc a {
+      display: block;
+      padding: 7px 9px;
+      border-radius: 8px;
+      color: #475569;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .toc a:hover { background: var(--primary-soft); color: var(--primary); }
+    main { min-width: 0; }
+    section { margin-bottom: 24px; padding: 28px; scroll-margin-top: 24px; }
+    h2 { margin: 0 0 18px; font-size: 23px; line-height: 1.4; }
+    h3 { margin: 24px 0 10px; font-size: 17px; }
+    p { margin: 8px 0 12px; }
+    .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .section-kicker { margin: 0 0 3px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .stat { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+    .stat strong { display: block; font-size: 28px; line-height: 1.2; }
+    .stat span { color: var(--muted); font-size: 12px; }
+    .stat.p0 strong { color: var(--p0); }
+    .stat.p1 strong { color: var(--p1); }
+    .stat.p2 strong { color: var(--p2); }
+    .stat.p3 strong { color: var(--p3); }
+
+    .notice {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--primary);
+      border-radius: 0 10px 10px 0;
+      background: var(--primary-soft);
+      color: #1e3a8a;
+    }
+    .notice.warning { border-left-color: #d97706; background: #fffbeb; color: #92400e; }
+    .notice.success { border-left-color: var(--success); background: var(--success-soft); color: #065f46; }
+
+    .priority {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 42px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .priority.p0 { color: var(--p0); background: var(--p0-soft); }
+    .priority.p1 { color: var(--p1); background: var(--p1-soft); }
+    .priority.p2 { color: var(--p2); background: var(--p2-soft); }
+    .priority.p3 { color: var(--p3); background: var(--p3-soft); }
+
+    .issue { padding: 18px 0; border-top: 1px solid var(--line); }
+    .issue:first-of-type { border-top: 0; }
+    .issue-title { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 7px; font-weight: 700; }
+    .issue-title .priority { flex: 0 0 auto; margin-top: 4px; }
+    .issue p { margin: 5px 0; }
+    .path { color: #475569; font-size: 13px; overflow-wrap: anywhere; }
+    .impact { color: #334155; }
+    .fix { color: var(--success); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--surface-soft); color: #475569; font-size: 12px; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 18px 0; }
+    .step { position: relative; padding: 14px 10px; border: 1px solid #bfdbfe; border-radius: 10px; background: var(--primary-soft); text-align: center; font-size: 13px; }
+    .step strong { display: block; color: var(--primary); }
+    .recommend-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .recommend { padding: 17px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+    .recommend h3 { margin: 0 0 7px; font-size: 15px; }
+    .recommend p { margin: 0; color: #475569; font-size: 13px; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 6px 0; }
+
+    .footer { padding: 0 24px 36px; color: var(--muted); text-align: center; font-size: 12px; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .toc { display: none; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow { grid-template-columns: 1fr; }
+      .step { text-align: left; }
+    }
+    @media (max-width: 600px) {
+      .hero { padding: 40px 20px; }
+      .layout { padding: 18px 12px 36px; }
+      section { padding: 20px 17px; }
+      .recommend-grid { grid-template-columns: 1fr; }
+      h2 { font-size: 20px; }
+    }
+    @media print {
+      body { background: #fff; font-size: 11px; }
+      .hero { padding: 24px; background: #1e40af !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .layout { display: block; padding: 16px 0; }
+      .toc { display: none; }
+      .card { border-color: #cbd5e1; box-shadow: none; }
+      section { margin-bottom: 12px; padding: 18px; break-inside: avoid; }
+      .issue { break-inside: avoid; }
+      pre { white-space: pre-wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Static Code Review · Bug Audit</p>
+      <h1>煤炭销售管理系统<br>Bug 检查报告</h1>
+      <p class="subtitle">按数据损坏风险、资金与库存影响、业务阻断程度分级，并评估使用 Redis 处理并发问题的适用边界。</p>
+      <div class="meta">
+        <span>报告日期：2026-11-12</span>
+        <span>后端：Spring Boot 3 + MyBatis-Plus</span>
+        <span>前端：Vue 3 + Vite</span>
+        <span>检查方式：静态代码审查</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container layout">
+    <aside class="toc card" aria-label="报告目录">
+      <p class="toc-title">报告目录</p>
+      <a href="#summary">01 · 检查结论</a>
+      <a href="#p0">02 · P0 严重问题</a>
+      <a href="#p1">03 · P1 高风险问题</a>
+      <a href="#p2">04 · P2 功能异常</a>
+      <a href="#p3">05 · P3 交互问题</a>
+      <a href="#redis">06 · Redis 方案评估</a>
+      <a href="#roadmap">07 · 推荐修复顺序</a>
+    </aside>
+
+    <main>
+      <section class="card" id="summary">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">01 / EXECUTIVE SUMMARY</p>
+            <h2>检查结论</h2>
+          </div>
+          <span class="priority p0">需优先处理</span>
+        </div>
+        <p>当前最需要优先处理的是<strong>库存、订单发运量及结算数据的一致性</strong>，其次才是页面与交互问题。部分缺陷具有确定的代码触发路径，不只是代码风格或可维护性问题。</p>
+        <div class="summary-grid">
+          <div class="stat p0"><strong>3</strong><span>P0 · 数据一致性风险</span></div>
+          <div class="stat p1"><strong>6</strong><span>P1 · 核心业务约束风险</span></div>
+          <div class="stat p2"><strong>6</strong><span>P2 · 明确功能异常</span></div>
+          <div class="stat p3"><strong>5</strong><span>P3 · 入口与交互问题</span></div>
+        </div>
+        <div class="notice warning">
+          <strong>验证范围说明：</strong>本报告以静态代码审查为主，尚未结合数据库执行完整业务流程回归。前端生产构建曾因涉及清理 <code>dist/assets</code> 被取消，因此不将构建结果作为本次结论依据。
+        </div>
+      </section>
+
+      <section class="card" id="p0">
+        <p class="section-kicker">02 / CRITICAL</p>
+        <h2><span class="priority p0">P0</span> 严重：可能造成库存或财务数据错误</h2>
+        <p class="muted">这些问题应在普通页面缺陷之前处理，并增加事务与并发回归测试。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>问题</th><th>主要后果</th><th>建议修复</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>磅单录毛重、作废缺少并发控制</strong><br><span class="path">WeighTicketServiceImpl.java:126-203、217-286</span></td>
+                <td>重复扣减或恢复库存、重复生成流水；不同磅单并发完成时，订单发运量可能丢失更新。</td>
+                <td>在数据库事务内锁定磅单和订单并重新检查状态；库存使用带余额条件的原子更新。</td>
+              </tr>
+              <tr>
+                <td><strong>结算审核与作废存在竞态</strong><br><span class="path">SettlementServiceImpl.java:182-237</span></td>
+                <td>可能出现“已审核但明细已删除”的结算单，应收金额失真，关联磅单还可能再次结算。</td>
+                <td>审核与作废使用相同的结算单行锁和事务，锁内校验状态后再更新。</td>
+              </tr>
+              <tr>
+                <td><strong>磅单作废与生成结算单存在竞态</strong><br><span class="path">WeighTicketServiceImpl.java:217-241<br>SettlementServiceImpl.java:114-165</span></td>
+                <td>已作废且已恢复库存的磅单仍可能形成应收，库存与财务数据相互矛盾。</td>
+                <td>两个流程共同锁定磅单；多磅单结算按 ID 排序加锁，锁内重新检查状态及结算记录。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="p1">
+        <p class="section-kicker">03 / HIGH</p>
+        <h2><span class="priority p1">P1</span> 高：核心业务约束或权限可被绕过</h2>
+
+        <article class="issue">
+          <div class="issue-title"><span>1. 修改订单数量不校验合同上限</span></div>
+          <p class="path">coal-sales/.../SaleOrderServiceImpl.java:150-165</p>
+          <p class="impact">修改订单时直接保存新计划量，可将订单改为远超合同余量的数量。</p>
+          <p class="fix"><strong>建议：</strong>按“合同累计量－本单原量＋新量”重新校验，并确保新计划量不小于已发运量。</p>
+        </article>
+
+        <article class="issue">
+          <div class="issue-title"><span>2. 销售员可以审核其他销售员的合同</span></div>
+          <p class="path">coal-sales/.../ContractController.java:78-86</p>
+          <p class="impact">控制器允许 <code>SALES</code> 审核，与“经理审批”规则不符。</p>
+          <p class="fix"><strong>建议：</strong>审核接口仅保留经理权限，服务层同步增加角色校验。</p>
+        </article>
+
+        <article class="issue">
+          <div class="issue-title"><span>3. 已完成、已取消订单仍能创建磅单</span></div>
+          <p class="path">coal-sales/.../WeighTicketServiceImpl.java:77-97</p>
+          <p class="impact">开单时只检查订单是否存在，会产生后续无法发运的无效磅单。</p>
+          <p class="fix"><strong>建议：</strong>仅允许待发运或部分发运订单开单。</p>
+        </article>
+
+        <article class="issue">
+          <div class="issue-title"><span>4. 存在有效磅单的订单仍能取消或删除</span></div>
+          <p class="path">coal-sales/.../SaleOrderServiceImpl.java:167-200</p>
+          <p class="impact">可能留下指向已取消或已删除订单的活动磅单。</p>
+          <p class="fix"><strong>建议：</strong>取消、删除前检查未作废磅单，并结合订单行锁防止并发绕过。</p>
+        </article>
+
+        <article class="issue">
+          <div class="issue-title"><span>5. 订单已结算数量从不更新</span></div>
+          <p class="path">SaleOrder.settledQty / SettlementServiceImpl.java</p>
+          <p class="impact">结算审核后没有累加 <code>settledQty</code>，作废已审核结算单时也没有回退。</p>
+          <p class="fix"><strong>建议：</strong>审核时按明细汇总净重并累加；作废已审核结算单时在删除明细前回退。</p>
+        </article>
+
+        <article class="issue">
+          <div class="issue-title"><span>6. 毛重仅校验大于皮重，缺少完整业务上限校验</span></div>
+          <p class="path">coal-sales/.../WeighTicketServiceImpl.java:135-203</p>
+          <p class="impact">异常净重、超出订单或合同允许范围的发运仍可能直接扣减库存。</p>
+          <p class="fix"><strong>建议：</strong>在库存写入前校验净重范围、累计发运量及合同溢短装上限。</p>
+        </article>
+      </section>
+
+      <section class="card" id="p2">
+        <p class="section-kicker">04 / MEDIUM</p>
+        <h2><span class="priority p2">P2</span> 中：功能确定异常</h2>
+        <ol>
+          <li><strong>合同自动完成条件永远不成立。</strong><br><span class="path">SaleOrderServiceImpl.java:134、142</span> 新订单状态为 <code>WAIT_SHIP</code>，却要求订单为 <code>FINISHED</code> 才完成合同。</li>
+          <li><strong>作废磅单后订单状态计算错误。</strong><br><span class="path">WeighTicketServiceImpl.java:257-258</span> 剩余发运量达到计划量时，仍会被设为“部分发运”，应统一状态计算规则。</li>
+          <li><strong>皮重来源未保存。</strong><br><span class="path">WeighTicketServiceImpl.java:116-119</span> 更新逻辑缺少 <code>setTareSource(dto.getTareSource())</code>。</li>
+          <li><strong>回款分页参数不匹配。</strong><br>前端传 <code>current</code>，后端接收 <code>page</code>，第 2 页开始仍返回第 1 页。</li>
+          <li><strong>编辑订单允许换合同，但后端忽略该字段。</strong><br>页面提示成功，实际合同未变化；若业务不允许换合同，编辑时应禁用合同选择框。</li>
+          <li><strong>订单号、磅单号按“记录数量＋1”生成。</strong><br>删除非末尾记录后可能生成重复编号，并发创建也可能冲突；建议使用独立流水并对唯一键冲突有限重试。</li>
+        </ol>
+      </section>
+
+      <section class="card" id="p3">
+        <p class="section-kicker">05 / LOW TO MEDIUM</p>
+        <h2><span class="priority p3">P3</span> 入口与交互问题</h2>
+        <ul>
+          <li>销售员、财务等角色的菜单权限与接口权限不一致，操作会稳定返回 403。</li>
+          <li>“菜单管理”和“操作日志”有菜单但没有对应前端路由，点击后内容区为空。</li>
+          <li>回款、结算、磅单等关键提交按钮没有防重复点击状态。</li>
+          <li>多个业务下拉框固定只查询前 100 条，后续数据无法选择或筛选。</li>
+          <li><code>WeighTicketServiceImpl.java:205-208</code> 的合同处理代码尚未完成，目前查询结果没有被使用。</li>
+        </ul>
+      </section>
+
+      <section class="card" id="redis">
+        <p class="section-kicker">06 / CONCURRENCY STRATEGY</p>
+        <h2>Redis 方案评估</h2>
+        <div class="notice success">
+          <strong>核心结论：</strong>Redis 可以加入，但不应替代 MySQL 事务与约束。正确方向是“数据库保证最终一致性，Redis 辅助分布式协调、接口幂等与缓存”。
+        </div>
+
+        <h3>单后端实例：优先使用数据库事务与行锁</h3>
+        <div class="flow" aria-label="数据库事务处理步骤">
+          <div class="step"><strong>01</strong>开启事务</div>
+          <div class="step"><strong>02</strong>锁定磅单并复查状态</div>
+          <div class="step"><strong>03</strong>锁定订单并重算发运量</div>
+          <div class="step"><strong>04</strong>原子更新库存并写流水</div>
+          <div class="step"><strong>05</strong>提交事务后释放锁</div>
+        </div>
+        <p>库存更新应保留数据库余额条件，并检查影响行数，防止库存扣成负数：</p>
+        <pre><code>UPDATE stock
+SET total_qty = total_qty + ?
+WHERE product_id = ?
+  AND total_qty + ? &gt;= 0;</code></pre>
+
+        <h3>多后端实例：Redis 作为辅助分布式锁</h3>
+        <p>可使用 Redisson，按业务单据设置锁，例如 <code>lock:weigh-ticket:{id}</code>、<code>lock:settlement:{id}</code>。同时必须满足：</p>
+        <ul>
+          <li>分布式锁覆盖到<strong>数据库事务提交完成</strong>，不能在提交前提前释放。</li>
+          <li>保留数据库状态校验、唯一索引和库存条件更新，不能只依赖 Redis 锁。</li>
+          <li>多资源加锁采用固定顺序，避免死锁。</li>
+          <li>不建议只在 Redis 中扣库存，再异步同步 MySQL，以免引入宕机、过期与一致性问题。</li>
+        </ul>
+
+        <div class="recommend-grid">
+          <div class="recommend">
+            <h3>适合：接口幂等</h3>
+            <p>通过请求唯一标识和 Redis 原子占位，配合数据库唯一约束，防止双击或网络重试造成重复开单、回款。</p>
+          </div>
+          <div class="recommend">
+            <h3>适合：读多写少缓存</h3>
+            <p>缓存数据字典、菜单权限和部分报表数据，设置 TTL，并在写操作后及时失效。</p>
+          </div>
+          <div class="recommend">
+            <h3>适合：多实例协调</h3>
+            <p>确实需要水平扩展时，再引入分布式锁作为数据库约束之外的协调手段。</p>
+          </div>
+          <div class="recommend">
+            <h3>不适合：唯一事实来源</h3>
+            <p>库存、订单状态、结算状态仍应以数据库事务结果为准，不以缓存值作为最终判断依据。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="roadmap">
+        <p class="section-kicker">07 / RECOMMENDED ROADMAP</p>
+        <h2>推荐修复顺序</h2>
+        <ol>
+          <li><strong>先修 P0：</strong>统一磅单、订单、库存、结算的事务和行锁，补充并发测试。</li>
+          <li><strong>再修 P1：</strong>补齐合同上限、订单状态、角色权限、结算数量等核心业务校验。</li>
+          <li><strong>随后修 P2：</strong>统一前后端字段、分页参数、状态计算和单号生成规则。</li>
+          <li><strong>最后修 P3：</strong>处理菜单入口、按钮权限、加载状态和防重复提交。</li>
+          <li><strong>按部署规模引入 Redis：</strong>单实例不强制；多实例时用于分布式协调、幂等和缓存。</li>
+        </ol>
+        <div class="notice">
+          每完成一个业务模块，应至少验证：编译通过、正常流程、非法状态拒绝、重复提交、两个并发请求，以及失败后的数据回滚。
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="footer">煤炭销售管理系统 · Bug 静态检查报告 · 本报告仅记录问题与修复建议，不代表已完成代码修复。</footer>
+</body>
+</html>

@@ -180,12 +180,12 @@ onMounted(() => {
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
         <el-form-item label="选择合同" prop="contractId">
-          <el-select v-model="form.contractId" placeholder="选择执行中的合同" style="width: 100%">
+          <el-select v-model="form.contractId" placeholder="选择执行中的合同" style="width: 100%":disabled="!!form.id">
             <el-option v-for="c in contractOptions" :key="c.id" :label="c.contractNo" :value="c.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="计划数量(吨)" prop="planQty">
-          <el-input-number v-model="form.planQty" :min="0" :precision="2" style="width: 100%" />
+          <el-input-number v-model="form.planQty" :min="0" :precision="2" style="width: 100%"  />
         </el-form-item>
         <el-form-item label="价格(元/吨)">
           <el-input-number v-model="form.price" :min="0" :precision="2" style="width: 100%" placeholder="不填默认取合同价" />

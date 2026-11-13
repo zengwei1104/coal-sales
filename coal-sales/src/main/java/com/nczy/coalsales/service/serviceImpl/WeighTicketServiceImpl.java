@@ -6,20 +6,16 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.nczy.coalsales.annotation.Log;
 import com.nczy.coalsales.common.BusinessException;
 import com.nczy.coalsales.common.PageResult;
+import com.nczy.coalsales.constant.ContractStatus;
 import com.nczy.coalsales.constant.SaleOrderStatus;
 import com.nczy.coalsales.constant.WeighTicketStatus;
 import com.nczy.coalsales.dto.WeighTicketCancelDTO;
 import com.nczy.coalsales.dto.WeighTicketGrossDTO;
 import com.nczy.coalsales.dto.WeighTicketTareDTO;
-import com.nczy.coalsales.entity.SaleOrder;
-import com.nczy.coalsales.entity.SettlementItem;
-import com.nczy.coalsales.entity.Stock;
-import com.nczy.coalsales.entity.StockRecord;
-import com.nczy.coalsales.entity.WeighTicket;
-import com.nczy.coalsales.mapper.SettlementItemMapper;
-import com.nczy.coalsales.mapper.StockMapper;
-import com.nczy.coalsales.mapper.WeighTicketMapper;
+import com.nczy.coalsales.entity.*;
+import com.nczy.coalsales.mapper.*;
 import com.nczy.coalsales.security.LoginUser;
+import com.nczy.coalsales.service.ContractService;
 import com.nczy.coalsales.service.SaleOrderService;
 import com.nczy.coalsales.service.StockRecordService;
 import com.nczy.coalsales.service.WeighTicketService;
@@ -39,25 +35,47 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
     private final StockMapper stockMapper;
     private final StockRecordService stockRecordService;
     private final SettlementItemMapper settlementItemMapper;
+    private final SaleOrderMapper saleOrderMapper;
+    private final  ContractMapper contractMapper;
+    private  final ContractService contractService;
 
     public WeighTicketServiceImpl(
             SaleOrderService saleOrderService,
             StockMapper stockMapper,
             StockRecordService stockRecordService,
-            SettlementItemMapper settlementItemMapper) {
+            SettlementItemMapper settlementItemMapper,
+            SaleOrderMapper saleOrderMapper,
+            ContractMapper contractMapper,
+            ContractService contractService) {
         this.saleOrderService = saleOrderService;
         this.stockMapper = stockMapper;
         this.stockRecordService = stockRecordService;
         this.settlementItemMapper = settlementItemMapper;
+        this.saleOrderMapper =saleOrderMapper;
+        this.contractMapper =contractMapper;
+        this.contractService =contractService;
     }
 
 
     // ============ 磅单号生成：BD + 年月日 + 3 位流水 ============
     private String genWeightNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = count(new LambdaQueryWrapper<WeighTicket>()
-                .likeRight(WeighTicket::getWeightNo, "BD" + date));
-        return "BD" + date + String.format("%03d", count + 1);
+        String prefix = "BD" + date;
+        String maxNo = baseMapper.selectMaxWeightNo(prefix);
+        int nextSeq = nextSeq(maxNo, prefix);
+        return prefix + String.format("%03d", nextSeq);
+    }
+
+    // 从当天最大编号解析流水号并 +1，无记录则从 1 开始
+    private int nextSeq(String maxNo, String prefix) {
+        if (maxNo != null && maxNo.startsWith(prefix) && maxNo.length() > prefix.length()) {
+            try {
+                return Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 编号格式异常时回退为 1
+            }
+        }
+        return 1;
     }
 
 
@@ -114,6 +132,7 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
         // ④ 更新（含状态、来源、时间）
         weighTicket.setTareWeight(dto.getTareWeight());
         weighTicket.setTareTime(LocalDateTime.now());
+        weighTicket.setTareSource(dto.getTareSource());
         weighTicket.setStatus(WeighTicketStatus.TARED);
         updateById(weighTicket);
     }
@@ -121,8 +140,8 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addGrossWeight(long id, WeighTicketGrossDTO dto) {
-        // ① 判空
-        WeighTicket weighTicket = getById(id);
+        // ① 锁定磅单，后续状态判断必须基于锁内读取的最新数据
+        WeighTicket weighTicket = baseMapper.selectByIdForUpdate(id);
         if (weighTicket == null) {
             throw new BusinessException("磅单不存在或已被删除");
         }
@@ -140,8 +159,8 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
         // ④ 计算净重 = 毛重 − 皮重
         BigDecimal netWeight = dto.getGrossWeight().subtract(weighTicket.getTareWeight());
 
-        // ⑤ 反查订单
-        SaleOrder order = saleOrderService.getById(weighTicket.getOrderId());
+        // ⑤ 锁定订单，防止多张磅单并发完成时互相覆盖 shippedQty
+        SaleOrder order = saleOrderMapper.selectByIdForUpdate(weighTicket.getOrderId());
         if (order == null) {
             throw new BusinessException("订单不存在或已被删除");
         }
@@ -178,16 +197,14 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
         record.setOperatorId(weighTicket.getWeighmanId());
         stockRecordService.save(record);
 
+        // ⑥ 条件更新磅单：必须仍处于“已称皮重”，避免重复完成
+        int ticketRows = baseMapper.finishWeighing(
+                id, dto.getGrossWeight(), netWeight, LocalDateTime.now());
+        if (ticketRows != 1) {
+            throw new BusinessException("磅单状态已变化，请刷新后重试");
+        }
 
-
-
-        weighTicket.setGrossWeight(dto.getGrossWeight());
-        weighTicket.setGrossTime(LocalDateTime.now());
-        weighTicket.setNetWeight(netWeight);
-        weighTicket.setStatus(WeighTicketStatus.FINISHED);
-        updateById(weighTicket);
-
-        // ⑦ 累加订单已发运量（读-改-写）
+        // ⑦ 累加订单已发运量（订单行已锁定，读-改-写安全）
         BigDecimal newShipped = order.getShippedQty().add(netWeight);
         SaleOrder orderUpdate = new SaleOrder();
         orderUpdate.setId(order.getId());
@@ -201,6 +218,25 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
         }
         saleOrderService.updateById(orderUpdate);
 
+        //  判断合同是否用满 → 自动置"已完成"（R10）
+        Contract contract = contractMapper.selectById(order.getContractId());
+        if (contract == null) {
+            throw new BusinessException("合同不存在或已被删除");
+        }
+
+        BigDecimal shippedTotal = saleOrderMapper.sumShippedQtyByContract(order.getContractId());
+        if (shippedTotal != null
+                && contract.getTotalQty() != null
+                && shippedTotal.compareTo(contract.getTotalQty()) >= 0) {
+            boolean contractRows  = contractService.lambdaUpdate()
+                    .eq(Contract::getId, contract.getId())
+                    .eq(Contract::getStatus, ContractStatus.EXECUTING)
+                    .set(Contract::getStatus, ContractStatus.FINISHED)
+                    .update();
+            // rows 为 0 说明合同状态已变化（并发下被改过），可忽略或记录日志
+        }
+
+
 
 
     }
@@ -210,7 +246,8 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
     @Transactional(rollbackFor = Exception.class)
     @Log("磅单作废")
     public void cancelWeighTicket(Long id, WeighTicketCancelDTO dto) {
-        WeighTicket weighTicket = getById(id);
+        // ① 锁定磅单，重复作废请求会在锁释放后看到最新状态
+        WeighTicket weighTicket = baseMapper.selectByIdForUpdate(id);
         if (weighTicket == null) {
             throw new BusinessException("磅单不存在或已被删除");
         }
@@ -231,15 +268,21 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
 
         Integer oldStatus = weighTicket.getStatus();
 
-        // 更新磅单为已作废
-        weighTicket.setStatus(WeighTicketStatus.CANCELLED);
-        weighTicket.setCancelReason(dto.getCancelReason());
-        updateById(weighTicket);
+        // ② 条件更新为已作废，并要求状态仍与锁内读取值一致
+        int ticketRows = baseMapper.cancelIfStatus(
+                id, oldStatus, dto.getCancelReason().trim());
+        if (ticketRows != 1) {
+            throw new BusinessException("磅单状态已变化，请刷新后重试");
+        }
 
         // 只有「已完成(2)」的磅单才回退订单
         if (WeighTicketStatus.FINISHED.equals(oldStatus)) {
-            // 1. 回退订单发运量
-            SaleOrder order = saleOrderService.getById(weighTicket.getOrderId());
+            if (weighTicket.getNetWeight() == null) {
+                throw new BusinessException("磅单净重数据异常，无法回退库存");
+            }
+
+            // 1. 锁定订单后回退发运量，防止覆盖其他磅单地并发更新
+            SaleOrder order = saleOrderMapper.selectByIdForUpdate(weighTicket.getOrderId());
             if (order == null) {
                 throw new BusinessException("订单不存在或已被删除");
             }
@@ -250,8 +293,13 @@ public class WeighTicketServiceImpl extends ServiceImpl<WeighTicketMapper, Weigh
             SaleOrder orderUpdate = new SaleOrder();
             orderUpdate.setId(order.getId());
             orderUpdate.setShippedQty(newShipped);
-            orderUpdate.setStatus(newShipped.compareTo(BigDecimal.ZERO) == 0
-                    ? SaleOrderStatus.WAIT_SHIP : SaleOrderStatus.PART_SHIPPED);
+            if (newShipped.compareTo(BigDecimal.ZERO) == 0) {
+                orderUpdate.setStatus(SaleOrderStatus.WAIT_SHIP);
+            } else if (newShipped.compareTo(order.getPlanQty()) >= 0) {
+                orderUpdate.setStatus(SaleOrderStatus.FINISHED);
+            } else {
+                orderUpdate.setStatus(SaleOrderStatus.PART_SHIPPED);
+            }
             saleOrderService.updateById(orderUpdate);
 
             // 2. 恢复库存（正数）

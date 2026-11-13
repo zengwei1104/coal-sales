@@ -23,6 +23,12 @@ public interface SettlementMapper extends BaseMapper<Settlement> {
     Settlement selectByIdForUpdate(@Param("id") Long id);
 
     /**
+     * 取指定前缀下最大的结算单号（用于“最大号 + 1”生成新号，避免删除后重复）。
+     */
+    @Select("SELECT MAX(settle_no) FROM settlement WHERE settle_no LIKE CONCAT(#{prefix}, '%')")
+    String selectMaxSettleNo(@Param("prefix") String prefix);
+
+    /**
      * 客户应收 = 已审核结算金额 - 已核销金额，实时计算。
      */
     @Select("SELECT IFNULL(SUM(s.total_amount - IFNULL(w.received_amount, 0)), 0) " +

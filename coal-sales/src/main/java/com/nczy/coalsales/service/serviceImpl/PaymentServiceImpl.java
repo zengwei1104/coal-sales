@@ -54,9 +54,22 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment>
     // ============ 回款单号：HK + 年月日 + 3 位流水 ============
     private String genPaymentNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = count(new LambdaQueryWrapper<Payment>()
-                .likeRight(Payment::getPaymentNo, "HK" + date));
-        return "HK" + date + String.format("%03d", count + 1);
+        String prefix = "HK" + date;
+        String maxNo = baseMapper.selectMaxPaymentNo(prefix);
+        int nextSeq = nextSeq(maxNo, prefix);
+        return prefix + String.format("%03d", nextSeq);
+    }
+
+    // 从当天最大编号解析流水号并 +1，无记录则从 1 开始
+    private int nextSeq(String maxNo, String prefix) {
+        if (maxNo != null && maxNo.startsWith(prefix) && maxNo.length() > prefix.length()) {
+            try {
+                return Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 编号格式异常时回退为 1
+            }
+        }
+        return 1;
     }
 
     @Override

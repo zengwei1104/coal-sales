@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux 学习笔记</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f9fc;
+    --border: #e3e8ef;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --accent: #1a54be;
+    --accent-soft: #eef4ff;
+    --code-bg: #f1f5f9;
+    --green: #16a34a;
+    --red: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+  /* 侧边目录 */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+    color: var(--accent);
+  }
+  .sidebar .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .sidebar nav a {
+    display: block;
+    padding: 7px 12px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  .sidebar nav a:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  /* 正文 */
+  .content {
+    padding: 40px 48px;
+    max-width: 900px;
+  }
+  h2 {
+    font-size: 24px;
+    color: var(--accent);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 8px;
+    margin-top: 48px;
+    scroll-margin-top: 20px;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 {
+    font-size: 18px;
+    margin-top: 28px;
+  }
+  p { margin: 12px 0; }
+  /* 代码块 */
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  pre .c { color: #64748b; } /* 注释 */
+  code.inline {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9em;
+    color: #be185d;
+  }
+  /* 表格 */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 9px 14px;
+    text-align: left;
+  }
+  th {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #fafbfd; }
+  td code { white-space: nowrap; }
+  /* 提示框 */
+  .tip {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .warn {
+    background: #fef2f2;
+    border-left: 4px solid var(--red);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .ok {
+    background: #f0fdf4;
+    border-left: 4px solid var(--green);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  /* 待补充标记 */
+  .todo {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 24px 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <h1>Linux 学习笔记</h1>
+    <div class="sub">持续更新中 · 2026-11-05</div>
+    <nav>
+      <a href="#vi">1. vi/vim 编辑器</a>
+      <a href="#java">2. 为什么能运行 Java</a>
+      <a href="#user">3. 用户与用户组</a>
+      <a href="#root">4. root 超级用户</a>
+      <a href="#cd">5. 切换目录 cd</a>
+      <a href="#mkdir">6. 新建目录 mkdir</a>
+      <a href="#rm">7. 删除文件/目录 rm</a>
+      <a href="#history">8. 历史命令</a>
+      <a href="#cat">9. 查看文件内容 cat</a>
+      <a href="#more">10. 分页查看 more / less</a>
+      <a href="#head">11. 查看开头/结尾 head / tail</a>
+      <a href="#cp">12. 复制文件/目录 cp</a>
+      <a href="#mv">13. 移动/重命名 mv</a>
+      <a href="#tar">14. 打包/压缩 tar</a>
+      <a href="#net">15. 网络与部署专题</a>
+      <a href="#ps">16. 进程管理 ps / kill / top</a>
+      <a href="#find">17. 搜索文件 find</a>
+      <a href="#grep">18. 文本搜索 grep</a>
+      <a href="#cmd">19. 常见命令速查</a>
+      <a href="#syntax">20. 命令行语法</a>
+      <a href="#tips">21. 报错排查</a>
+      <a href="#next">22. 待补充</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <h2 id="vi">1. vi/vim 编辑器</h2>
+    <p><code class="inline">vi</code> / <code class="inline">vim</code> 是 Linux 最常用的文本编辑器，vim 是 vi 的增强版。</p>
+    <h3>三种模式（核心概念）</h3>
+    <table>
+      <tr><th>模式</th><th>进入方式</th><th>作用</th></tr>
+      <tr><td>命令模式</td><td>启动后默认</td><td>移动光标、复制、删除、退出</td></tr>
+      <tr><td>插入模式</td><td>按 <code>i</code> / <code>a</code> / <code>o</code></td><td>输入文字</td></tr>
+      <tr><td>底线命令模式</td><td>按 <code>:</code></td><td>保存、退出、查找替换</td></tr>
+    </table>
+    <h3>完整操作流程</h3>
+    <pre>vi test.txt      <span class="c"># 1. 打开文件</span>
+<span class="c"># 2. 按 i 进入插入模式，输入内容</span>
+<span class="c"># 3. 按 Esc 退出插入模式</span>
+<span class="c"># 4. 输入 :wq 保存并退出</span></pre>
+    <h3>退出 / 保存</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>:w</code></td><td>保存（不退出）</td></tr>
+      <tr><td><code>:q</code></td><td>退出（未修改时）</td></tr>
+      <tr><td><code>:q!</code></td><td>不保存，强制退出（改乱时用）</td></tr>
+      <tr><td><code>:wq</code> / <code>:x</code></td><td>保存并退出</td></tr>
+      <tr><td><code>ZZ</code></td><td>保存并退出（命令模式直接按）</td></tr>
+    </table>
+    <h3>进入插入模式</h3>
+    <table>
+      <tr><th>按键</th><th>作用</th></tr>
+      <tr><td><code>i</code></td><td>光标前插入</td></tr>
+      <tr><td><code>a</code></td><td>光标后插入</td></tr>
+      <tr><td><code>o</code></td><td>下一行插入</td></tr>
+      <tr><td><code>O</code></td><td>上一行插入</td></tr>
+    </table>
+    <h3>移动光标（命令模式）</h3>
+    <table>
+      <tr><th>按键</th><th>作用</th></tr>
+      <tr><td><code>h</code> <code>j</code> <code>k</code> <code>l</code></td><td>左 下 上 右</td></tr>
+      <tr><td><code>0</code> / <code>$</code></td><td>行首 / 行尾</td></tr>
+      <tr><td><code>gg</code> / <code>G</code></td><td>文件开头 / 结尾</td></tr>
+      <tr><td><code>Ctrl+f</code> / <code>Ctrl+b</code></td><td>下翻页 / 上翻页</td></tr>
+    </table>
+    <h3>删除 / 复制 / 粘贴</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>dd</code></td><td>删除（剪切）当前行</td></tr>
+      <tr><td><code>yy</code></td><td>复制当前行</td></tr>
+      <tr><td><code>p</code></td><td>粘贴到光标后</td></tr>
+      <tr><td><code>u</code></td><td>撤销</td></tr>
+      <tr><td><code>Ctrl+r</code></td><td>重做</td></tr>
+    </table>
+    <h3>查找 / 替换</h3>
+    <pre>/关键词          <span class="c"># 向下查找（n 下一个，N 上一个）</span>
+:%s/旧/新/g       <span class="c"># 全文替换</span>
+:set nu          <span class="c"># 显示行号</span>
+:set nonu        <span class="c"># 取消行号</span></pre>
+    <div class="warn"><strong>新手常见坑</strong>：乱按键没反应 → 先按 <code class="inline">Esc</code> 回命令模式；想退退不掉 → <code class="inline">Esc</code> 再 <code class="inline">:q!</code> 或 <code class="inline">:wq</code>。左下角显示 <code class="inline">-- 插入 --</code> 说明在插入模式。</div>
+    <div class="tip">退出 SSH 会话：输入 <code class="inline">exit</code> 或按 <code class="inline">Ctrl + D</code>。</div>
+
+    <h2 id="java">2. 为什么能运行 Java</h2>
+    <p>因为电脑上装了 <strong>JDK（Java 开发工具包）</strong>，并且配置了 <code class="inline">PATH</code> 环境变量。两个条件缺一不可：</p>
+    <ol>
+      <li><strong>装了 JDK</strong>：包含 <code class="inline">java</code>（运行）和 <code class="inline">javac</code>（编译）。</li>
+      <li><strong>配了 PATH</strong>：把 JDK 的 <code class="inline">bin</code> 目录加入系统环境变量，终端在任意目录都能找到命令。</li>
+    </ol>
+    <pre>java -version    <span class="c"># 查看 Java 版本</span>
+where java       <span class="c"># 查看 java.exe 所在路径</span></pre>
+
+    <h2 id="user">3. 用户与用户组</h2>
+    <h3>查看当前用户</h3>
+    <pre>whoami    <span class="c"># 显示当前用户名</span>
+who       <span class="c"># 显示当前登录的所有用户</span></pre>
+    <h3>查看系统所有用户</h3>
+    <pre>cat /etc/passwd        <span class="c"># 每行：用户名:密码占位:UID:GID:描述:家目录:shell</span>
+cut -d: -f1 /etc/passwd <span class="c"># 只看用户名列表</span></pre>
+    <h3>用户组</h3>
+    <pre>cat /etc/group   <span class="c"># 所有组</span>
+groups           <span class="c"># 当前用户属于哪些组</span>
+groups 用户名    <span class="c"># 查看指定用户的组</span></pre>
+    <h3>查看用户详细信息</h3>
+    <pre>id            <span class="c"># 查看自己</span>
+id 用户名     <span class="c"># 查看指定用户，如 id root</span></pre>
+    <div class="warn">注意：<code class="inline">id</code> 和 <code class="inline">groups</code> 后面要跟<strong>真实存在的用户名</strong>，且区分大小写（Linux 用户名通常全小写）。拼错会报 <code class="inline">no such user</code>。</div>
+
+    <h2 id="root">4. root 超级用户</h2>
+    <p><code class="inline">root</code> 是超级管理员，UID/GID 都是 <code class="inline">0</code>。权限最高，但平时不建议长期用它登录。</p>
+    <h3>切换到 root</h3>
+    <pre>sudo -i        <span class="c"># 切换到 root（推荐）</span>
+su -           <span class="c"># 切换到 root（需要 root 密码）</span>
+sudo 命令      <span class="c"># 以 root 权限执行单条命令</span></pre>
+    <h3>如何判断自己是 root</h3>
+    <p>看命令行提示符结尾：</p>
+    <table>
+      <tr><th>提示符</th><th>含义</th></tr>
+      <tr><td><code>zengwei@主机:~$</code></td><td>普通用户（结尾 <code>$</code>）</td></tr>
+      <tr><td><code>root@主机:~#</code></td><td>root（结尾 <code>#</code>）</td></tr>
+    </table>
+    <h3>退出 root</h3>
+    <pre>exit    <span class="c"># 或按 Ctrl + D</span></pre>
+    <h3>练手：管理用户完整流程</h3>
+    <pre>useradd testuser      <span class="c"># 创建测试用户</span>
+id testuser           <span class="c"># 查看它的信息</span>
+userdel -r testuser   <span class="c"># 删除（-r 连家目录一起删）</span></pre>
+    <div class="warn"><strong>root 操作风险高</strong>：删除文件不会进回收站、不二次确认，操作前务必想清楚。</div>
+
+    <h2 id="cd">5. 切换目录 cd</h2>
+    <pre>cd /etc          <span class="c"># 绝对路径</span>
+cd 目录名        <span class="c"># 相对路径（当前目录下的子目录）</span>
+cd ..            <span class="c"># 上一级</span>
+cd ../..         <span class="c"># 上两级</span>
+cd ~             <span class="c"># 回到 home 目录</span>
+cd -             <span class="c"># 回到上一次所在目录</span>
+cd /             <span class="c"># 根目录</span></pre>
+    <div class="tip"><strong>Tab 补全</strong>：输入目录名前几个字母按 <code class="inline">Tab</code> 自动补全，按两下列出所有匹配项。</div>
+    <h3>家目录（home）</h3>
+    <p>普通用户的家目录在 <code class="inline">/home/用户名</code>，不在 <code class="inline">/用户名</code>。可以用 <code class="inline">~</code> 代表它：</p>
+    <pre>echo $HOME         <span class="c"># 查看自己家目录路径（如 /home/zengwei）</span>
+ls -al ~           <span class="c"># 列出家目录内容（~ = /home/zengwei）</span>
+cd ~               <span class="c"># 回到 home；直接 cd（不带参数）效果相同</span></pre>
+    <div class="warn">报错 <code class="inline">ls: cannot access '/zengwei': No such file or directory</code> 就是因为家目录在 <code class="inline">/home/zengwei</code> 而不是 <code class="inline">/zengwei</code>。用 <code class="inline">~</code> 最省事。</div>
+
+    <h2 id="mkdir">6. 新建目录 mkdir</h2>
+    <p><code class="inline">mkdir</code>（make directory）用于新建目录。</p>
+    <pre>mkdir test             <span class="c"># 当前目录新建 test</span>
+mkdir /home/zengwei/a  <span class="c"># 指定绝对路径新建</span>
+mkdir a b c            <span class="c"># 一次新建多个</span>
+mkdir -p a/b/c         <span class="c"># 递归创建多级目录（父目录自动补上）</span>
+mkdir -m 755 dir       <span class="c"># 创建时指定权限</span></pre>
+    <p><code class="inline">-p</code> 最常用，没有它时父目录不存在会报错：</p>
+    <pre>mkdir a/b/c      <span class="c"># ❌ a 或 a/b 不存在会报 No such file or directory</span>
+mkdir -p a/b/c   <span class="c"># ✅ 自动把 a、a/b 一起建好</span></pre>
+    <div class="warn">目录名不能重名：已存在时再建会报 <code class="inline">File exists</code>。</div>
+    <p>删除目录：<code class="inline">rmdir</code>（只能删空目录）或 <code class="inline">rm -r</code>（递归删除，慎用）：</p>
+    <pre>rmdir test    <span class="c"># 只能删空目录</span>
+rm -r test    <span class="c"># 删除目录及其所有内容</span></pre>
+
+    <h2 id="rm">7. 删除文件/目录 rm</h2>
+    <p><code class="inline">rm</code>（remove）删除文件或目录，<strong>删了就没了，不进回收站</strong>，用前要想清楚。</p>
+    <pre>rm file            <span class="c"># 删除单个文件</span>
+rm file1 file2     <span class="c"># 一次删除多个文件</span>
+rm -r dir          <span class="c"># 递归删除目录（-r 必须带才能删目录）</span>
+rm -f file         <span class="c"># 强制删除，不提示（-f force）</span>
+rm -rf dir         <span class="c"># 强制递归删除（最危险，慎用！）</span>
+rm -i file         <span class="c"># 删除前逐个询问确认（-i 交互式）</span></pre>
+    <h3>选项区别</h3>
+    <table>
+      <tr><th>选项</th><th>含义</th><th>说明</th></tr>
+      <tr><td><code>-r</code></td><td>recursive 递归</td><td>删目录必须带，否则删不了目录</td></tr>
+      <tr><td><code>-f</code></td><td>force 强制</td><td>不提示、不报错（文件不存在也不报错）</td></tr>
+      <tr><td><code>-i</code></td><td>interactive 交互</td><td>每个文件删除前都问 yes/no</td></tr>
+    </table>
+    <h3>通配符用法</h3>
+    <pre>rm *.txt       <span class="c"># 删除当前目录所有 .txt 文件</span>
+rm *.log       <span class="c"># 删除所有 .log 文件</span>
+rm -r test*    <span class="c"># 删除所有 test 开头的目录/文件</span></pre>
+    <div class="warn"><strong>危险命令（千万别执行）</strong>：<br>
+    <code class="inline">rm -rf /</code> —— 删根目录，毁掉整个系统<br>
+    <code class="inline">rm -rf *</code> —— 删当前目录下所有东西<br>
+    <code class="inline">rm -rf ~</code> —— 删光你的家目录<br>
+    这些命令执行后无法恢复，root 用户下尤其要小心。</div>
+    <h3>安全建议</h3>
+    <ol>
+      <li>删除前用 <code class="inline">ls</code> 确认目标。</li>
+      <li>用 <code class="inline">rm -i *.txt</code> 逐个询问，更稳妥。</li>
+      <li>别在 root 下乱删系统文件。</li>
+    </ol>
+
+    <h2 id="history">8. 历史命令</h2>
+    <p>复制之前写过的命令，几种方法：</p>
+    <table>
+      <tr><th>方法</th><th>操作</th><th>说明</th></tr>
+      <tr><td>方向键</td><td><code>↑</code> / <code>↓</code></td><td>上一条 / 下一条，最快</td></tr>
+      <tr><td>搜索</td><td><code>Ctrl + R</code></td><td>输入关键词实时搜索，回车执行，左右键编辑</td></tr>
+      <tr><td>列表</td><td><code>history</code></td><td>列出所有历史命令（带编号）</td></tr>
+      <tr><td>按编号执行</td><td><code>!编号</code></td><td>如 <code>!42</code> 执行第 42 条</td></tr>
+      <tr><td>快捷键</td><td><code>Ctrl + P</code> / <code>Ctrl + N</code></td><td>等同 <code>↑</code> / <code>↓</code></td></tr>
+    </table>
+    <div class="tip">想快速找上一条 → 按 <code class="inline">↑</code>；搜很久之前的 → <code class="inline">Ctrl + R</code> 输关键词；看完整列表 → <code class="inline">history</code>。</div>
+
+    <h2 id="cat">9. 查看文件内容 cat</h2>
+    <p><code class="inline">cat</code>（concatenate）最常用功能是<strong>查看文件内容</strong>，把内容输出到屏幕。</p>
+    <pre>cat file.txt          <span class="c"># 查看文件内容</span>
+cat a.txt b.txt       <span class="c"># 一次查看多个文件（按顺序拼接输出）</span>
+cat file1 &gt; file2     <span class="c"># file1 内容写入 file2（覆盖）</span>
+cat file1 &gt;&gt; file2    <span class="c"># file1 内容追加到 file2 末尾</span>
+cat &gt; new.txt         <span class="c"># 手动输入内容创建文件（Ctrl+D 结束）</span></pre>
+    <h3>常用选项</h3>
+    <pre>cat -n file.txt    <span class="c"># 显示行号</span>
+cat -b file.txt    <span class="c"># 显示行号（空行不编号）</span>
+cat -A file.txt    <span class="c"># 显示所有不可见字符（行尾 $ 等）</span></pre>
+    <h3>手动创建文件（重点）</h3>
+    <pre>cat &gt; hello.txt    <span class="c"># 回车后进入输入模式</span>
+<span class="c"># 输入内容，每行一句</span>
+<span class="c"># 按 Ctrl + D 保存退出</span>
+cat hello.txt      <span class="c"># 再查看刚才写的内容</span></pre>
+    <p><code class="inline">&gt;</code> 是重定向，把 <code class="inline">cat</code> 的输出（你敲的内容）写进文件。</p>
+    <div class="warn"><code class="inline">cat</code> 会把整个文件一次性全打印出来，大文件会刷屏。大文件更适合用 <code class="inline">head</code>（开头）、<code class="inline">tail</code>（结尾）、<code class="inline">less</code>（分页，按 q 退出）。</div>
+    <pre>head file.txt     <span class="c"># 只看开头 10 行</span>
+tail file.txt     <span class="c"># 只看结尾 10 行</span>
+less file.txt     <span class="c"># 分页查看，上下翻页，按 q 退出</span></pre>
+    <h3>配合其他命令</h3>
+    <pre>cat file.txt | grep "关键词"   <span class="c"># 查看并过滤出含关键词的行</span></pre>
+
+    <h2 id="more">10. 分页查看 more / less</h2>
+    <p><code class="inline">more</code> 用于<strong>分页查看文件</strong>，一屏一屏显示，不像 <code class="inline">cat</code> 一次性刷完。</p>
+    <pre>more 文件名</pre>
+    <h3>more 打开后操作</h3>
+    <table>
+      <tr><th>按键</th><th>作用</th></tr>
+      <tr><td><code>空格</code></td><td>向下翻一屏</td></tr>
+      <tr><td><code>回车</code></td><td>向下翻一行</td></tr>
+      <tr><td><code>b</code></td><td>向上翻一屏</td></tr>
+      <tr><td><code>q</code></td><td>退出</td></tr>
+      <tr><td><code>=</code></td><td>显示当前行号</td></tr>
+      <tr><td><code>/关键词</code></td><td>搜索关键词（按 <code>n</code> 找下一个）</td></tr>
+    </table>
+    <h3>常用选项</h3>
+    <pre>more -5 file.txt    <span class="c"># 每屏只显示 5 行</span>
+more +10 file.txt   <span class="c"># 从第 10 行开始显示</span>
+more -c file.txt    <span class="c"># 翻页时先清屏再显示</span></pre>
+    <h3>more、less、cat 的区别</h3>
+    <table>
+      <tr><th>命令</th><th>特点</th></tr>
+      <tr><td><code>cat</code></td><td>一次性全打印，文件大时刷屏</td></tr>
+      <tr><td><code>more</code></td><td>只能向下翻，功能简单</td></tr>
+      <tr><td><code>less</code></td><td>能上下自由翻，功能更强（推荐）</td></tr>
+    </table>
+    <div class="tip">实际使用中 <code class="inline">less</code> 比 <code class="inline">more</code> 更好用（能向上翻），按键两者基本通用。快速看文件用 <code class="inline">cat</code>，需要来回翻用 <code class="inline">less</code>。</div>
+
+    <h2 id="head">11. 查看开头/结尾 head / tail</h2>
+    <p><code class="inline">head</code> 查看文件<strong>开头</strong>，默认前 10 行；<code class="inline">tail</code> 查看文件<strong>结尾</strong>，默认后 10 行。</p>
+    <h3>head 常用用法</h3>
+    <pre>head file.txt        <span class="c"># 默认显示前 10 行</span>
+head -5 file.txt     <span class="c"># 显示前 5 行（-n 5 效果一样）</span>
+head -n 20 file.txt  <span class="c"># 显示前 20 行</span>
+head -c 100 file.txt <span class="c"># 显示前 100 个字节</span>
+head a.txt b.txt     <span class="c"># 查看多个文件（每个文件前加 ==&gt; 标题）</span></pre>
+    <h3>tail 常用用法</h3>
+    <pre>tail file.txt        <span class="c"># 默认显示后 10 行</span>
+tail -20 file.txt    <span class="c"># 显示后 20 行（-n 20 效果一样）</span>
+tail -n 30 file.txt  <span class="c"># 显示后 30 行</span>
+tail -c 100 file.txt <span class="c"># 显示最后 100 个字节</span>
+tail -f app.log      <span class="c"># 实时跟踪文件末尾（看日志超好用，Ctrl+C 退出）</span></pre>
+    <p><code class="inline">-f</code>（follow）会让 <code class="inline">tail</code> 一直盯着文件，有新内容追加就立刻显示，非常适合看运行中的日志。</p>
+    <h3>head 与 tail 对比</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th><th>常见用法</th></tr>
+      <tr><td><code>head</code></td><td>看文件开头</td><td><code>head -20 file</code></td></tr>
+      <tr><td><code>tail</code></td><td>看文件结尾</td><td><code>tail -20 file</code></td></tr>
+      <tr><td><code>tail -f</code></td><td>实时跟踪文件末尾</td><td><code>tail -f app.log</code></td></tr>
+    </table>
+    <div class="tip">看配置文件开头用 <code class="inline">head /etc/passwd</code>；实时盯日志用 <code class="inline">tail -f app.log</code>。</div>
+
+    <h2 id="cp">12. 复制文件/目录 cp</h2>
+    <p><code class="inline">cp</code>（copy）复制文件或目录。</p>
+    <pre>cp a.txt b.txt              <span class="c"># 复制成 b.txt（复制并改名）</span>
+cp a.txt /tmp/              <span class="c"># 复制到 /tmp 下（保持原名）</span>
+cp a.txt /tmp/b.txt         <span class="c"># 复制到 /tmp 并改名</span>
+cp a.txt b.txt c.txt dir/   <span class="c"># 一次复制多个文件到 dir</span>
+cp -r dir1 dir2             <span class="c"># 复制目录必须加 -r（递归）</span></pre>
+    <div class="warn">复制目录一定要加 <code class="inline">-r</code>，否则报错 <code class="inline">cp: -r not specified; omitting directory</code>。</div>
+    <h3>常用选项</h3>
+    <pre>cp -r dir1 dir2   <span class="c"># 递归复制目录</span>
+cp -i a.txt b.txt <span class="c"># 覆盖前询问确认（-i interactive）</span>
+cp -f a.txt b.txt <span class="c"># 强制覆盖，不提示（-f force）</span>
+cp -p a.txt b.txt <span class="c"># 保留权限、时间戳等属性</span>
+cp -v a.txt b.txt <span class="c"># 显示复制过程（-v verbose）</span>
+cp -a dir1 dir2   <span class="c"># 归档复制，保留所有属性（备份常用）</span></pre>
+    <h3>注意点</h3>
+    <ol>
+      <li>目标重名会<strong>直接覆盖</strong>，想安全点加 <code class="inline">-i</code>。</li>
+      <li>复制目录别忘 <code class="inline">-r</code>（新手最常见错误）。</li>
+    </ol>
+    <h3>常见示例</h3>
+    <pre>cp /etc/passwd /etc/passwd.bak   <span class="c"># 备份文件</span>
+cp -r ~/project /tmp/backup/     <span class="c"># 复制整个目录</span>
+cp -a ~/project /tmp/backup/     <span class="c"># 归档复制保留属性（备份推荐）</span></pre>
+
+    <h2 id="mv">13. 移动/重命名 mv</h2>
+    <p><code class="inline">mv</code>（move）移动文件/目录，也可以用来<strong>重命名</strong>。</p>
+    <h3>移动</h3>
+    <pre>mv a.txt /tmp/              <span class="c"># 移动到 /tmp 下</span>
+mv a.txt /tmp/b.txt         <span class="c"># 移动并改名</span>
+mv dir1 /tmp/               <span class="c"># 移动目录（不用加 -r，和 cp 不同）</span>
+mv a.txt b.txt c.txt dir/   <span class="c"># 一次移动多个文件</span></pre>
+    <div class="tip"><code class="inline">mv</code> 移动目录<strong>不需要加 <code class="inline">-r</code></strong>，这点和 <code class="inline">cp</code> 不一样。</div>
+    <h3>重命名（最常用）</h3>
+    <pre>mv a.txt b.txt     <span class="c"># 同目录下移动 = 重命名</span>
+mv oldname newname <span class="c"># 改名</span></pre>
+    <h3>常用选项</h3>
+    <pre>mv -i a.txt b.txt   <span class="c"># 覆盖前询问确认</span>
+mv -f a.txt b.txt   <span class="c"># 强制覆盖，不提示</span>
+mv -n a.txt b.txt   <span class="c"># 目标已存在则不覆盖</span>
+mv -v a.txt b.txt   <span class="c"># 显示移动过程</span></pre>
+    <h3>和 cp 的对比</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th><th>目录是否需要 -r</th></tr>
+      <tr><td><code>cp</code></td><td>复制（原文件保留）</td><td>需要 <code>-r</code></td></tr>
+      <tr><td><code>mv</code></td><td>移动/重命名（原文件消失）</td><td>不需要</td></tr>
+    </table>
+    <div class="warn">目标重名会直接覆盖，想安全点加 <code class="inline">-i</code>。</div>
+    <h3>常见示例</h3>
+    <pre>mv file.txt file.txt.bak    <span class="c"># 重命名（等于备份）</span>
+mv ~/a.txt /tmp/            <span class="c"># 移动到 /tmp</span>
+mv project project_old      <span class="c"># 目录重命名</span></pre>
+
+    <h2 id="tar">14. 打包/压缩 tar</h2>
+    <p><code class="inline">tar</code> 用于<strong>打包和压缩</strong>，最常见就是解压各种 <code class="inline">.tar.gz</code>、<code class="inline">.tar</code>、<code class="inline">.tgz</code> 文件。</p>
+    <h3>三个核心参数</h3>
+    <table>
+      <tr><th>参数</th><th>含义</th></tr>
+      <tr><td><code>-c</code></td><td>create，创建（打包）</td></tr>
+      <tr><td><code>-x</code></td><td>extract，解压</td></tr>
+      <tr><td><code>-z</code></td><td>用 gzip 压缩/解压（.gz）</td></tr>
+      <tr><td><code>-v</code></td><td>verbose，显示处理过程（加不加不影响结果）</td></tr>
+      <tr><td><code>-f</code></td><td>file，指定文件名（一般都要带）</td></tr>
+    </table>
+    <div class="tip">有 <code class="inline">z</code> → 处理 <code class="inline">.tar.gz</code>（压缩包）；没 <code class="inline">z</code> → 处理 <code class="inline">.tar</code>（纯打包不压缩）。<code class="inline">c</code> 打包 / <code class="inline">x</code> 解包，互相对应。</div>
+    <h3>纯打包 vs 压缩打包</h3>
+    <pre>tar -cvf hello.tar hello          <span class="c"># 只打包不压缩（无 z）</span>
+tar -zcvf hello.tar.gz hello      <span class="c"># 打包 + gzip 压缩（有 z）</span></pre>
+    <h3>解压（最常用）</h3>
+    <pre>tar -xzf 文件.tar.gz              <span class="c"># 解压 .tar.gz</span>
+tar -zxvf 文件.tar.gz             <span class="c"># 解压并显示过程（-v）</span>
+tar -xvf 文件.tar                 <span class="c"># 解包 .tar（未压缩，不用 z）</span>
+tar -xzf 文件.tgz                 <span class="c"># .tgz 和 .tar.gz 一样</span>
+tar -xzf 文件.tar.gz -C /目标目录  <span class="c"># 解压到指定目录（注意是大写 C）</span></pre>
+    <h3>打包/压缩</h3>
+    <pre>tar -czf 打包名.tar.gz 要打包的目录   <span class="c"># 打包成 .tar.gz</span>
+tar -czf backup.tar.gz project/       <span class="c"># 打包 project 目录</span></pre>
+    <h3>只看内容不解压</h3>
+    <pre>tar -tzf 文件.tar.gz   <span class="c"># 列出压缩包内容（不真正解压）</span></pre>
+    <h3>参数组合记忆</h3>
+    <table>
+      <tr><th>写法</th><th>拆解</th><th>意思</th></tr>
+      <tr><td><code>tar -xzf</code> / <code>-zxvf</code></td><td>extract + gzip + file</td><td>解压 .gz 文件</td></tr>
+      <tr><td><code>tar -czf</code> / <code>-zcvf</code></td><td>create + gzip + file</td><td>创建 .gz 压缩包</td></tr>
+      <tr><td><code>tar -tzf</code></td><td>list + gzip + file</td><td>查看 .gz 内容</td></tr>
+    </table>
+    <div class="tip"><code class="inline">tar -zcvf</code> 和 <code class="inline">tar -czf</code> 是同一个意思，参数顺序无所谓，<code class="inline">-v</code> 只是让你看得见过程。</div>
+    <h3>常用压缩格式对照</h3>
+    <table>
+      <tr><th>文件后缀</th><th>解压命令</th></tr>
+      <tr><td><code>.tar.gz</code> / <code>.tgz</code></td><td><code>tar -xzf 文件</code></td></tr>
+      <tr><td><code>.tar</code></td><td><code>tar -xf 文件</code></td></tr>
+      <tr><td><code>.tar.bz2</code></td><td><code>tar -xjf 文件</code></td></tr>
+      <tr><td><code>.zip</code></td><td><code>unzip 文件.zip</code></td></tr>
+      <tr><td><code>.gz</code></td><td><code>gunzip 文件.gz</code></td></tr>
+    </table>
+    <h3>常见示例</h3>
+    <pre>tar -xzf nginx-1.20.tar.gz      <span class="c"># 解压源码包到当前目录</span>
+tar -xzf app.tar.gz -C /opt/    <span class="c"># 解压到指定目录</span>
+tar -czf code.tar.gz code/      <span class="c"># 打包 code 文件夹</span>
+tar -tzf code.tar.gz            <span class="c"># 查看压缩包内容</span></pre>
+
+    <h2 id="net">15. 网络与部署专题</h2>
+
+    <h3>网络接口 ip addr</h3>
+    <p><code class="inline">ip addr</code> 查看所有网卡和 IP 地址。</p>
+    <pre>ip addr    <span class="c"># 查看所有网络接口</span></pre>
+    <table>
+      <tr><th>接口</th><th>含义</th></tr>
+      <tr><td><code>lo</code></td><td>回环接口，127.0.0.1，指向本机自己</td></tr>
+      <tr><td><code>ens160</code>（或 ens/enp 开头）</td><td>真实物理网卡，如 IP 192.168.73.128</td></tr>
+    </table>
+    <p>关键字段：<code class="inline">inet</code>=IPv4 地址，<code class="inline">inet6</code>=IPv6，<code class="inline">link/ether</code>=MAC 地址。<code class="inline">/24</code> 表示子网掩码 255.255.255.0。</p>
+
+    <h3>防火墙 firewalld</h3>
+    <p>AlmaLinux / CentOS 用 firewalld，命令 <code class="inline">firewall-cmd</code>。<strong>普通用户操作防火墙必须加 sudo</strong>，否则报 <code class="inline">Authorization failed</code>。</p>
+    <pre>sudo firewall-cmd --state                     <span class="c"># 查看运行状态</span>
+sudo firewall-cmd --list-all                   <span class="c"># 查看所有配置</span>
+sudo firewall-cmd --list-ports                 <span class="c"># 查看已开放端口</span>
+sudo firewall-cmd --zone=public --add-port=8080/tcp --permanent   <span class="c"># 开放端口</span>
+sudo firewall-cmd --zone=public --remove-port=8080/tcp --permanent <span class="c"># 关闭端口</span>
+sudo firewall-cmd --reload                     <span class="c"># 重新加载（改了必须 reload）</span></pre>
+    <div class="warn">加了 <code class="inline">--permanent</code> 是永久生效，但必须 <code class="inline">--reload</code> 后才真正生效；不加则是临时生效，重启失效。</div>
+    <h4>常见端口对照</h4>
+    <table>
+      <tr><th>服务</th><th>端口</th></tr>
+      <tr><td>SSH</td><td>22</td></tr>
+      <tr><td>HTTP（网页）</td><td>80</td></tr>
+      <tr><td>HTTPS</td><td>443</td></tr>
+      <tr><td>MySQL</td><td>3306</td></tr>
+      <tr><td>Redis</td><td>6379</td></tr>
+      <tr><td>Tomcat / Spring Boot</td><td>8080</td></tr>
+    </table>
+
+    <h3>端口的概念</h3>
+    <p>一个 IP 对应一台机器，<strong>端口</strong>是机器上不同的"服务窗口"，每个服务占一个端口，互不冲突。</p>
+    <pre>你的服务器 IP：192.168.73.128
+后端（Spring Boot）→ 8080 端口
+前端（Nginx）      → 80 端口
+MySQL              → 3306 端口
+SSH                → 22 端口</pre>
+
+    <h3>localhost 与 IP 的区别</h3>
+    <p><code class="inline">localhost</code> = <code class="inline">127.0.0.1</code> = <strong>当前这台机器自己</strong>。它永远指你正在操作的那台机器。</p>
+    <table>
+      <tr><th>在哪访问</th><th>写法</th></tr>
+      <tr><td>在 Linux 服务器本机上</td><td><code>localhost:8080</code> 或 <code>127.0.0.1:8080</code></td></tr>
+      <tr><td>在 Windows 电脑上访问 Linux</td><td><code>192.168.73.128:8080</code>（写 Linux 的 IP）</td></tr>
+    </table>
+    <div class="tip">程序部署在 Linux 上后，从别的电脑访问要用 Linux 的 IP，不能再写 localhost。</div>
+
+    <h3>浏览器访问的真实地址</h3>
+    <p>网址拆成四部分：<code class="inline">协议://IP或域名:端口/路径</code>。真实地址永远是 <strong>IP:端口</strong>，域名只是 IP 的别名（靠 DNS 翻译）。</p>
+    <table>
+      <tr><th>写法</th><th>实际端口</th></tr>
+      <tr><td><code>http://域名</code></td><td>默认 80</td></tr>
+      <tr><td><code>https://域名</code></td><td>默认 443</td></tr>
+      <tr><td><code>http://IP:8080</code></td><td>显式 8080</td></tr>
+    </table>
+
+    <h3>内网 IP 与公网 IP</h3>
+    <table>
+      <tr><th>类型</th><th>范围/说明</th></tr>
+      <tr><td>内网（私网）IP</td><td><code>192.168.x.x</code>、<code>10.x.x.x</code>、<code>172.16~31.x.x</code>，只在局域网有效，互联网访问不到</td></tr>
+      <tr><td>公网 IP</td><td>全球唯一，互联网上的服务器用</td></tr>
+    </table>
+    <p>你能上 bilibili 是因为路由器做 <strong>NAT（地址转换）</strong>，让你共用一个公网 IP 出去。但外面的人无法直接访问你的内网 IP。</p>
+    <h4>让外网访问你的项目（三种办法）</h4>
+    <ol>
+      <li><strong>路由器端口映射</strong>：公网某端口映射到你 Linux 的端口（需公网 IP）。</li>
+      <li><strong>内网穿透</strong>：frp、ngrok、花生壳等，生成公网地址。</li>
+      <li><strong>部署到云服务器</strong>：阿里云/腾讯云有公网 IP，正式上线做法。</li>
+    </ol>
+
+    <h3>前后端分离部署端口</h3>
+    <p>前端（Vue 打包后 Nginx 托管）跑 80 端口，后端（Spring Boot）跑 8080，MySQL 跑 3306。</p>
+    <pre>浏览器
+  │ 1.访问 http://IP:80（前端页面）
+  ▼
+Nginx（80 端口）→ 返回 HTML/CSS/JS
+  │ 2.页面 JS 请求后端
+  ▼
+Spring Boot（8080 端口）→ 查数据库
+  ▼
+MySQL（3306 端口）</pre>
+    <div class="tip"><strong>访问三条件</strong>：同一局域网（网络通）+ 服务在监听端口 + 防火墙放行端口。三者都满足才能访问。</div>
+
+    <h2 id="ps">16. 进程管理 ps / kill / top</h2>
+    <h3>查看进程 ps</h3>
+    <p><code class="inline">ps -ef</code> 查看当前系统所有进程。</p>
+    <pre>ps -ef           <span class="c"># 显示所有进程（全格式）</span>
+ps -aux          <span class="c"># 也显示所有进程，多了 CPU/内存百分比</span>
+ps -ef | grep java    <span class="c"># 配合 grep 找某个服务的进程</span></pre>
+    <h3>输出各列含义</h3>
+    <table>
+      <tr><th>列</th><th>含义</th></tr>
+      <tr><td><code>UID</code></td><td>运行该进程的用户</td></tr>
+      <tr><td><code>PID</code></td><td>进程 ID（唯一标识，操作靠它）</td></tr>
+      <tr><td><code>PPID</code></td><td>父进程 ID</td></tr>
+      <tr><td><code>C</code></td><td>CPU 占用</td></tr>
+      <tr><td><code>STIME</code></td><td>启动时间</td></tr>
+      <tr><td><code>TTY</code></td><td>关联终端（<code>?</code> 表示后台服务）</td></tr>
+      <tr><td><code>TIME</code></td><td>累计占用 CPU 时间</td></tr>
+      <tr><td><code>CMD</code></td><td>启动进程的命令</td></tr>
+    </table>
+    <h3>结束进程 kill</h3>
+    <pre>kill 12345      <span class="c"># 正常结束进程（PID 12345）</span>
+kill -9 12345   <span class="c"># 强制结束（-9 强制杀死）</span></pre>
+    <p>流程：先 <code class="inline">ps -ef | grep 关键字</code> 找到 PID，再用 <code class="inline">kill PID</code> 结束。</p>
+    <h3>实时查看 top / htop</h3>
+    <pre>top      <span class="c"># 实时看进程和资源占用，按 q 退出</span>
+htop     <span class="c"># 增强版（可能需先安装）</span></pre>
+    <p><code class="inline">top</code> 常用快捷键：<code class="inline">q</code> 退出，<code class="inline">k</code> 杀进程（输入 PID），<code class="inline">M</code> 按内存排序，<code class="inline">P</code> 按 CPU 排序。</p>
+
+    <h2 id="find">17. 搜索文件 find</h2>
+    <p><code class="inline">find</code> 按文件名、类型、大小、时间等条件搜索文件。</p>
+    <h3>按文件名搜索</h3>
+    <pre>find / -name "文件名"        <span class="c"># 全盘搜索（从根目录开始）</span>
+find /etc -name "*.conf"    <span class="c"># 在 /etc 下搜所有 .conf</span>
+find ~ -name "test.txt"     <span class="c"># 在家目录搜</span>
+find . -name "*.java"       <span class="c"># 当前目录搜 .java</span></pre>
+    <h3>按类型搜索</h3>
+    <pre>find / -type f -name "*.log"   <span class="c"># f=普通文件</span>
+find / -type d -name "nginx"   <span class="c"># d=目录</span></pre>
+    <h3>按大小 / 时间搜索</h3>
+    <pre>find / -size +100M    <span class="c"># 大于 100M 的文件</span>
+find / -size +1G      <span class="c"># 大于 1G 的文件</span>
+find / -mtime -7      <span class="c"># 最近 7 天修改过的文件</span></pre>
+    <h3>忽略权限错误（推荐）</h3>
+    <pre>find / -name "nginx.conf" 2&gt;/dev/null   <span class="c"># 忽略 Permission denied</span></pre>
+    <h3>配合执行操作</h3>
+    <pre>find . -name "*.tmp" -delete                <span class="c"># 找到后删除</span>
+find . -name "*.log" -exec ls -l {} \;       <span class="c"># 找到后执行命令</span></pre>
+    <h3>实用场景</h3>
+    <pre>find / -name "redis.conf" 2&gt;/dev/null   <span class="c"># 全盘找文件</span>
+find /opt -name "*.jar"                  <span class="c"># 找 .jar 文件</span>
+find / -size +1G 2&gt;/dev/null             <span class="c"># 找大文件（清理磁盘）</span></pre>
+    <div class="tip">和 <code class="inline">ls</code>、<code class="inline">locate</code> 区别：<code class="inline">find</code> 实时搜索功能最强但慢，<code class="inline">locate</code> 走索引超快但可能不实时。</div>
+
+    <h2 id="grep">18. 文本搜索 grep</h2>
+    <p><code class="inline">grep</code> 在文件<strong>内容</strong>里查找关键词。</p>
+    <pre>grep "error" log.txt          <span class="c"># 在文件里找 error</span>
+grep "root" /etc/passwd       <span class="c"># 找包含 root 的行</span>
+grep -n "error" log.txt       <span class="c"># 显示行号</span>
+grep -i "error" log.txt       <span class="c"># 忽略大小写</span></pre>
+    <h3>常用选项</h3>
+    <table>
+      <tr><th>选项</th><th>作用</th></tr>
+      <tr><td><code>-n</code></td><td>显示行号</td></tr>
+      <tr><td><code>-i</code></td><td>忽略大小写</td></tr>
+      <tr><td><code>-v</code></td><td>反向匹配（显示不包含关键词的行）</td></tr>
+      <tr><td><code>-r</code></td><td>递归搜索目录下所有文件</td></tr>
+      <tr><td><code>-c</code></td><td>只显示匹配行数（计数）</td></tr>
+      <tr><td><code>-l</code></td><td>只显示包含关键词的文件名</td></tr>
+    </table>
+    <h3>递归搜索目录</h3>
+    <pre>grep -r "关键词" 目录/     <span class="c"># 搜索目录下所有文件</span>
+grep -rn "port" /etc/     <span class="c"># 在 /etc 下递归找 port，带行号</span></pre>
+    <h3>配合管道（最常用）</h3>
+    <pre>ps -ef | grep java              <span class="c"># 找 java 进程</span>
+ps -ef | grep nginx             <span class="c"># 找 nginx 进程</span>
+history | grep tar              <span class="c"># 历史命令里找 tar</span>
+cat log.txt | grep "error"      <span class="c"># 日志里过滤 error</span></pre>
+    <h3>正则表达式</h3>
+    <pre>grep "^root" /etc/passwd       <span class="c"># 以 root 开头的行（^ 开头）</span>
+grep "bash$" /etc/passwd       <span class="c"># 以 bash 结尾的行（$ 结尾）</span>
+grep -E "error|warn" log.txt   <span class="c"># 匹配多个关键词（或）</span></pre>
+    <div class="tip"><strong>grep 和 find 的区别</strong>：<code class="inline">grep</code> 搜<strong>文件内容</strong>里的文字，<code class="inline">find</code> 搜<strong>文件名</strong>。</div>
+
+    <h2 id="cmd">19. 常见命令速查</h2>
+    <h3>文件和目录</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>ls</code> / <code>ls -la</code></td><td>列出文件（-l 详细，-a 含隐藏）</td></tr>
+      <tr><td><code>cd 目录</code></td><td>切换目录</td></tr>
+      <tr><td><code>pwd</code></td><td>显示当前路径</td></tr>
+      <tr><td><code>mkdir 目录</code></td><td>新建目录</td></tr>
+      <tr><td><code>touch 文件</code></td><td>新建空文件</td></tr>
+      <tr><td><code>cp 源 目标</code></td><td>复制</td></tr>
+      <tr><td><code>mv 源 目标</code></td><td>移动 / 重命名</td></tr>
+      <tr><td><code>rm 文件</code></td><td>删除文件</td></tr>
+      <tr><td><code>rm -r 目录</code></td><td>删除目录（递归）</td></tr>
+      <tr><td><code>cat 文件</code></td><td>查看文件内容</td></tr>
+      <tr><td><code>head</code> / <code>tail 文件</code></td><td>看开头 / 结尾（<code>tail -f</code> 实时跟踪）</td></tr>
+      <tr><td><code>find / -name "xxx"</code></td><td>搜索文件</td></tr>
+    </table>
+    <h3>用户和权限</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>whoami</code></td><td>当前用户</td></tr>
+      <tr><td><code>id 用户</code></td><td>查看用户信息</td></tr>
+      <tr><td><code>useradd</code> / <code>userdel 用户</code></td><td>创建 / 删除用户</td></tr>
+      <tr><td><code>passwd 用户</code></td><td>改密码</td></tr>
+      <tr><td><code>chmod 755 文件</code></td><td>改文件权限</td></tr>
+      <tr><td><code>chown 用户:组 文件</code></td><td>改文件归属</td></tr>
+      <tr><td><code>sudo 命令</code></td><td>以 root 执行</td></tr>
+    </table>
+    <h3>软件安装</h3>
+    <pre>yum install 包名    <span class="c"># CentOS / Fedora</span>
+dnf install 包名    <span class="c"># 新版 CentOS / Fedora</span>
+apt install 包名    <span class="c"># Ubuntu / Debian</span></pre>
+    <h3>系统管理</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>df -h</code></td><td>看磁盘空间</td></tr>
+      <tr><td><code>free -h</code></td><td>看内存</td></tr>
+      <tr><td><code>top</code> / <code>htop</code></td><td>看进程和负载</td></tr>
+      <tr><td><code>ps aux</code></td><td>查看进程</td></tr>
+      <tr><td><code>kill 进程号</code></td><td>结束进程</td></tr>
+      <tr><td><code>systemctl status 服务</code></td><td>看服务状态</td></tr>
+      <tr><td><code>reboot</code> / <code>shutdown -h now</code></td><td>重启 / 关机</td></tr>
+    </table>
+    <h3>网络</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>ip addr</code> / <code>ifconfig</code></td><td>看 IP</td></tr>
+      <tr><td><code>ping 地址</code></td><td>测连通</td></tr>
+      <tr><td><code>curl 网址</code></td><td>请求网页 / 下载</td></tr>
+      <tr><td><code>ss -tlnp</code></td><td>看监听端口</td></tr>
+      <tr><td><code>wget 网址</code></td><td>下载文件</td></tr>
+    </table>
+    <h3>其他实用</h3>
+    <table>
+      <tr><th>命令</th><th>作用</th></tr>
+      <tr><td><code>history</code></td><td>查看历史命令</td></tr>
+      <tr><td><code>clear</code></td><td>清屏</td></tr>
+      <tr><td><code>man 命令</code></td><td>查看命令手册</td></tr>
+      <tr><td><code>grep "关键词" 文件</code></td><td>在文件中搜索</td></tr>
+      <tr><td><code>tar -xzf 文件.tar.gz</code></td><td>解压</td></tr>
+    </table>
+
+    <h2 id="syntax">20. 命令行语法</h2>
+    <h3>一条命令的基本结构</h3>
+    <pre>命令  [选项]  [参数]</pre>
+    <table>
+      <tr><th>部分</th><th>说明</th><th>例子</th></tr>
+      <tr><td>命令</td><td>做什么</td><td><code>ls</code>、<code>cp</code>、<code>rm</code></td></tr>
+      <tr><td>选项</td><td>怎么做的细节（<code>-</code> 开头）</td><td><code>-l</code>、<code>-a</code>、<code>-r</code></td></tr>
+      <tr><td>参数</td><td>作用对象</td><td>文件名、目录名</td></tr>
+    </table>
+    <pre>ls -la /etc
+<span class="c"># ls 是命令，-la 是选项（详细+隐藏），/etc 是参数（目标目录）</span></pre>
+    <h3>关键符号</h3>
+    <table>
+      <tr><th>符号</th><th>作用</th><th>例子</th></tr>
+      <tr><td><code>-</code> / <code>--</code></td><td>选项前缀</td><td><code>-l</code>、<code>--help</code></td></tr>
+      <tr><td><code>空格</code></td><td>分隔命令、选项、参数</td><td><code>ls -l</code></td></tr>
+      <tr><td><code>|</code></td><td>管道，左边结果传给右边</td><td><code>ps aux | grep java</code></td></tr>
+      <tr><td><code>&gt;</code></td><td>输出重定向（覆盖写）</td><td><code>echo hi &gt; a.txt</code></td></tr>
+      <tr><td><code>&gt;&gt;</code></td><td>追加写文件</td><td><code>echo hi &gt;&gt; a.txt</code></td></tr>
+      <tr><td><code>;</code></td><td>一行执行多条</td><td><code>cd /tmp; ls</code></td></tr>
+      <tr><td><code>&amp;&amp;</code></td><td>前一条成功才执行后一条</td><td><code>mkdir a &amp;&amp; cd a</code></td></tr>
+      <tr><td><code>#</code></td><td>注释</td><td><code># 这是注释</code></td></tr>
+      <tr><td><code>~</code></td><td>home 目录</td><td><code>cd ~</code></td></tr>
+      <tr><td><code>.</code></td><td>当前目录</td><td><code>./脚本</code></td></tr>
+      <tr><td><code>..</code></td><td>上一级目录</td><td><code>cd ..</code></td></tr>
+      <tr><td><code>*</code></td><td>通配符，匹配任意字符</td><td><code>rm *.txt</code></td></tr>
+      <tr><td><code>$变量</code></td><td>取变量值</td><td><code>echo $PATH</code></td></tr>
+    </table>
+    <h3>选项写法规律</h3>
+    <pre>ls -l      <span class="c"># 单字母选项</span>
+ls -la     <span class="c"># 多个单字母合写</span>
+ls --all   <span class="c"># 长选项，更易读</span>
+ls --help  <span class="c"># 查看帮助</span></pre>
+
+    <h2 id="tips">21. 报错排查</h2>
+    <h3>command not found</h3>
+    <p>意思是「系统找不到这个命令」。常见三种原因：</p>
+    <ul>
+      <li><strong>拼写/参数错误</strong>：如 <code class="inline">rooy</code>（应为 <code class="inline">root</code>）、<code class="inline">head -f</code>（<code class="inline">-f</code> 是 <code class="inline">tail</code> 的参数）。</li>
+      <li><strong>命令是两个词连一起了</strong>：如 <code class="inline">ipaddr</code>（应为 <code class="inline">ip addr</code>）。</li>
+      <li><strong>软件未安装</strong>：如 <code class="inline">wget</code>，需先 <code class="inline">yum install wget -y</code>。</li>
+    </ul>
+    <div class="tip">排查方法：用 <code class="inline">命令 --help</code> 或 <code class="inline">man 命令</code> 查用法；不确定拼写时按 <code class="inline">Tab</code> 补全。</div>
+
+    <h2 id="next">22. 待补充</h2>
+    <div class="todo">
+      这里留给后续继续添加的知识点，例如：<br>
+      · 文件权限 chmod 详解<br>
+      · 管道与重定向进阶<br>
+      · Shell 脚本基础<br>
+      · 进程管理进阶<br>
+      · 磁盘与挂载<br>
+      （想到什么再加进来）
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

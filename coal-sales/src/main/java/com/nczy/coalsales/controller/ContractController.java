@@ -70,7 +70,7 @@ public class ContractController {
     @PostMapping("/{id}/submit")
     public Result<Void> submit(@PathVariable Long id,
                                @AuthenticationPrincipal LoginUser loginUser) {
-        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER, RoleConstant.SALES);
+        AuthUtil.checkRole(loginUser, RoleConstant.ADMIN, RoleConstant.MANAGER);
         contractService.submit(id, loginUser);
         return Result.success("提交成功", null);
     }

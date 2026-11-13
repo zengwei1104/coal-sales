@@ -1,6 +1,7 @@
 package com.nczy.coalsales.service.serviceImpl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.nczy.coalsales.annotation.Log;
@@ -32,6 +33,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -59,9 +61,22 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
     // ============ 结算单号：JS + 年月日 + 3 位流水 ============
     private String genSettleNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = count(new LambdaQueryWrapper<Settlement>()
-                .likeRight(Settlement::getSettleNo, "JS" + date));
-        return "JS" + date + String.format("%03d", count + 1);
+        String prefix = "JS" + date;
+        String maxNo = baseMapper.selectMaxSettleNo(prefix);
+        int nextSeq = nextSeq(maxNo, prefix);
+        return prefix + String.format("%03d", nextSeq);
+    }
+
+    // 从当天最大编号解析流水号并 +1，无记录则从 1 开始
+    private int nextSeq(String maxNo, String prefix) {
+        if (maxNo != null && maxNo.startsWith(prefix) && maxNo.length() > prefix.length()) {
+            try {
+                return Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 编号格式异常时回退为 1
+            }
+        }
+        return 1;
     }
 
     // ============ 分页 ============
@@ -108,19 +123,26 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
             throw new BusinessException("请至少选择一张磅单");
         }
 
+        // 去重并按 id 排序，统一加锁顺序，降低死锁概率
+        List<Long> ticketIds = dto.getTicketIds().stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<WeighTicket> tickets = new ArrayList<>();
         BigDecimal totalQty = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        for (Long ticketId : dto.getTicketIds()) {
-            WeighTicket ticket = weighTicketMapper.selectById(ticketId);
+        // 逐张锁定磅单，锁内校验状态与是否已结算
+        for (Long ticketId : ticketIds) {
+            WeighTicket ticket = weighTicketMapper.selectByIdForUpdate(ticketId);
             if (ticket == null) {
                 throw new BusinessException("磅单不存在或已被删除，id=" + ticketId);
             }
-            // 状态必须已完成
             if (!WeighTicketStatus.FINISHED.equals(ticket.getStatus())) {
                 throw new BusinessException("磅单 " + ticket.getWeightNo() + " 未完成，不可结算");
             }
-            // 必须属于该合同（磅单 → 订单 → 合同）
             if (ticket.getOrderId() == null) {
                 throw new BusinessException("磅单 " + ticket.getWeightNo() + " 无关联订单");
             }
@@ -128,13 +150,13 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
             if (order == null || !contract.getId().equals(order.getContractId())) {
                 throw new BusinessException("磅单 " + ticket.getWeightNo() + " 不属于该合同");
             }
-            // 未被结算过
             Long settled = settlementItemMapper.selectCount(
                     new LambdaQueryWrapper<SettlementItem>()
                             .eq(SettlementItem::getTicketId, ticketId));
             if (settled != null && settled > 0) {
                 throw new BusinessException("磅单 " + ticket.getWeightNo() + " 已结算，不可重复结算");
             }
+            tickets.add(ticket);
         }
 
         // ③ 组装结算单
@@ -146,18 +168,17 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
         settlement.setTaxAmount(BigDecimal.ZERO);
         settlement.setTotalQty(BigDecimal.ZERO);
         settlement.setTotalAmount(BigDecimal.ZERO);
-        save(settlement); // 先保存拿到 id
+        save(settlement);
 
-        // ④ 组装明细（一行一张磅单）
-        for (Long ticketId : dto.getTicketIds()) {
-            WeighTicket ticket = weighTicketMapper.selectById(ticketId);
-
-            BigDecimal amount = ticket.getNetWeight().multiply(contract.getPrice())
+        // ④ 使用已锁定的磅单对象组装明细，不再重复查询
+        for (WeighTicket ticket : tickets) {
+            BigDecimal amount = ticket.getNetWeight()
+                    .multiply(contract.getPrice())
                     .setScale(2, RoundingMode.HALF_UP);
 
             SettlementItem item = new SettlementItem();
             item.setSettleId(settlement.getId());
-            item.setTicketId(ticketId);
+            item.setTicketId(ticket.getId());
             item.setProductId(ticket.getProductId());
             item.setNetWeight(ticket.getNetWeight());
             item.setPrice(contract.getPrice());
@@ -168,22 +189,24 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
             totalAmount = totalAmount.add(amount);
         }
 
-        // ⑤ 回填汇总（金额 2 位，重量 3 位）
-        totalQty = totalQty.setScale(3, RoundingMode.HALF_UP);
-        totalAmount = totalAmount.setScale(2, RoundingMode.HALF_UP);
-
+        // ⑤ 回填汇总
         Settlement update = new Settlement();
         update.setId(settlement.getId());
-        update.setTotalQty(totalQty);
-        update.setTotalAmount(totalAmount);
+        update.setTotalQty(totalQty.setScale(3, RoundingMode.HALF_UP));
+        update.setTotalAmount(totalAmount.setScale(2, RoundingMode.HALF_UP));
         updateById(update);
     }
 
     // ============ 审核 ============
     @Override
+    @Transactional(rollbackFor = Exception.class)
     @Log("审核结算单")
     public void audit(Long id, SettlementAuditDTO dto, LoginUser loginUser) {
-        Settlement settlement = getSettlement(id);
+        //
+        Settlement settlement = baseMapper.selectByIdForUpdate(id);
+        if (settlement == null) {
+            throw new BusinessException("结算单不存在或已被删除");
+        }
         if (!SettlementStatus.WAIT_AUDIT.equals(settlement.getStatus())) {
             throw new BusinessException("只有待审核的结算单才能审核");
         }
@@ -193,7 +216,6 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
             throw new BusinessException("不能审核自己创建的结算单");
         }
         Settlement update = new Settlement();
-        update.setId(id);
         update.setAuditBy(loginUser.getUserId());
         update.setAuditTime(LocalDateTime.now());
         if (Boolean.TRUE.equals(dto.getPass())) {
@@ -203,7 +225,16 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
             update.setStatus(SettlementStatus.WAIT_AUDIT);
             update.setRemark(dto.getOpinion());
         }
-        updateById(update);
+        // 2. 条件更新：只允许“待审核”状态被更新
+        LambdaUpdateWrapper<Settlement> wrapper =
+                new LambdaUpdateWrapper<Settlement>()
+                        .eq(Settlement::getId, id)
+                        .eq(Settlement::getStatus, SettlementStatus.WAIT_AUDIT);
+
+        int rows = baseMapper.update(update, wrapper);
+        if (rows != 1) {
+            throw new BusinessException("结算单状态已变化，请刷新后重试");
+        }
     }
 
     // ============ 作废 ============
@@ -226,9 +257,17 @@ public class SettlementServiceImpl extends ServiceImpl<SettlementMapper, Settlem
         }
 
         Settlement update = new Settlement();
-        update.setId(id);
         update.setStatus(SettlementStatus.CANCELLED);
-        updateById(update);
+
+        LambdaUpdateWrapper<Settlement> wrapper =
+                new LambdaUpdateWrapper<Settlement>()
+                        .eq(Settlement::getId, id)
+                        .eq(Settlement::getStatus, settlement.getStatus());
+
+        int rows = baseMapper.update(update, wrapper);
+        if (rows != 1) {
+            throw new BusinessException("结算单状态已变化，请刷新后重试");
+        }
 
         // 释放磅单：删除结算明细，使磅单可再次结算
         settlementItemMapper.delete(

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker 指令速查表 · 实施岗版</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --border: #e5e7eb;
+    --text: #1f2937; --muted: #6b7280;
+    --blue: #185fa5; --blue-bg: #e6f1fb; --blue-line: #b5d4f4;
+    --teal: #0f6e56; --teal-bg: #e1f5ee; --teal-line: #9fe1cb;
+    --amber: #854f0b; --amber-bg: #faeeda; --amber-line: #fac775;
+    --pink: #993556; --pink-bg: #fbeaf0; --pink-line: #f4c0d1;
+    --purple: #534ab7; --purple-bg: #eeedfe; --purple-line: #cecbf6;
+    --code-bg: #1f2937; --code-text: #e5e7eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7; padding: 32px 16px;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+  header {
+    background: linear-gradient(135deg, #185fa5, #0f6e56); color: #fff;
+    border-radius: 16px; padding: 32px 36px; margin-bottom: 24px;
+  }
+  header h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+  header p { font-size: 14px; opacity: 0.92; }
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .toc a {
+    color: #fff; text-decoration: none; font-size: 12px;
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3);
+    padding: 4px 12px; border-radius: 16px;
+  }
+  section.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px 28px; margin-bottom: 20px;
+  }
+  h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  h2 .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .item {
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+    margin-bottom: 12px; background: #fafbfc;
+  }
+  .item:last-child { margin-bottom: 0; }
+  .cmd {
+    font-family: "SF Mono", "Consolas", "Menlo", monospace;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 10px 14px; border-radius: 8px; font-size: 13px;
+    overflow-x: auto; white-space: pre; margin: 8px 0;
+  }
+  .cmd .c { color: #7dd3fc; }
+  .desc { font-size: 14px; margin-top: 6px; }
+  .desc b { font-weight: 600; }
+  .badge {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    margin-left: 6px; vertical-align: middle; font-weight: 500;
+  }
+  .badge.hot { background: var(--pink-bg); color: var(--pink); }
+  .badge.tip { background: var(--teal-bg); color: var(--teal); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: #fafbfc; font-weight: 600; color: #374151; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: "SF Mono", "Consolas", monospace; font-size: 13px; }
+  .tip-box {
+    background: var(--amber-bg); border: 1px solid var(--amber-line);
+    border-radius: 10px; padding: 14px 18px; font-size: 13px; color: var(--amber); margin-top: 16px;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Docker 指令速查表 · 实施岗版</h1>
+    <p>面向软件实施场景整理，只保留真正用得上的命令，按使用频率分类</p>
+    <div class="toc">
+      <a href="#life">容器生命周期</a>
+      <a href="#inspect">查看与排错</a>
+      <a href="#image">镜像管理</a>
+      <a href="#build">Dockerfile 指令</a>
+      <a href="#compose">Compose</a>
+      <a href="#net">网络与数据卷</a>
+    </div>
+  </header>
+
+  <!-- 容器生命周期 -->
+  <section class="card" id="life">
+    <h2><span class="dot" style="background:#185fa5"></span>一、容器生命周期（最常用）</h2>
+    <div class="sub">日常部署、启动、停止、删除都靠这几个</div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=123456 -v /data/mysql:/var/lib/mysql mysql:8.0</span></div>
+      <div class="desc"><b>docker run</b> 创建并启动容器 <span class="badge hot">最高频</span></div>
+      <div class="desc">参数含义：<b>-d</b> 后台运行 · <b>--name</b> 命名 · <b>-p</b> 端口映射(宿主机:容器) · <b>-e</b> 环境变量 · <b>-v</b> 数据卷挂载</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker ps</span>        <span class="c">docker ps -a</span></div>
+      <div class="desc"><b>docker ps</b> 看正在运行的容器；<b>-a</b> 看所有容器(含已停止) <span class="badge hot">最高频</span></div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker start 容器名</span>    <span class="c">docker stop 容器名</span>    <span class="c">docker restart 容器名</span></div>
+      <div class="desc"><b>start</b> 启动已停止的容器 · <b>stop</b> 停止 · <b>restart</b> 重启 <span class="badge hot">最高频</span></div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker rm 容器名</span>    <span class="c">docker rm -f 容器名</span></div>
+      <div class="desc"><b>rm</b> 删除已停止的容器；<b>-f</b> 强制删除(运行中也删)。注意：删容器 ≠ 删数据，数据在卷里</div>
+    </div>
+  </section>
+
+  <!-- 查看与排错 -->
+  <section class="card" id="inspect">
+    <h2><span class="dot" style="background:#0f6e56"></span>二、查看与排错（实施岗 80% 时间在这）</h2>
+    <div class="sub">容器出问题时，按这个顺序排查</div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker logs -f 容器名</span></div>
+      <div class="desc"><b>docker logs</b> 看容器日志，<b>-f</b> 实时跟踪(相当于 tail -f) <span class="badge hot">排错第一步</span></div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker exec -it 容器名 bash</span></div>
+      <div class="desc"><b>docker exec</b> 进入容器内部排查，<b>-it</b> 交互式终端(容器里是 sh 就用 sh)</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker inspect 容器名</span></div>
+      <div class="desc"><b>docker inspect</b> 看容器详细配置(IP、挂载、环境变量、网络等)</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker top 容器名</span>    <span class="c">docker stats</span></div>
+      <div class="desc"><b>top</b> 看容器内进程 · <b>stats</b> 看资源占用(CPU/内存)</div>
+    </div>
+  </section>
+
+  <!-- 镜像管理 -->
+  <section class="card" id="image">
+    <h2><span class="dot" style="background:#854f0b"></span>三、镜像管理</h2>
+    <div class="sub">拉取、查看、删除镜像</div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker pull mysql:8.0</span>    <span class="c">docker images</span></div>
+      <div class="desc"><b>pull</b> 拉取镜像 · <b>images</b> 查看本地镜像列表</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker build -t myapp:1.0 .</span></div>
+      <div class="desc"><b>build</b> 根据 Dockerfile 构建镜像，<b>-t</b> 打标签(名字:版本)，<b>.</b> 表示 Dockerfile 所在目录</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker rmi 镜像名</span>    <span class="c">docker tag 源镜像 目标名:版本</span></div>
+      <div class="desc"><b>rmi</b> 删除镜像 · <b>tag</b> 给镜像打标签(常用于加仓库地址)</div>
+    </div>
+  </section>
+
+  <!-- Dockerfile 指令 -->
+  <section class="card" id="build">
+    <h2><span class="dot" style="background:#993556"></span>四、Dockerfile 常用指令</h2>
+    <div class="sub">实施岗只需「读懂 + 会改 + 会写最简单的」</div>
+    <table>
+      <thead><tr><th>指令</th><th>作用</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><b>FROM</b></td><td>指定基础镜像(起点)</td><td class="mono">FROM tomcat:9.0</td></tr>
+        <tr><td class="mono"><b>COPY</b></td><td>把文件拷进镜像</td><td class="mono">COPY myapp.war /usr/local/tomcat/webapps/</td></tr>
+        <tr><td class="mono"><b>ADD</b></td><td>拷贝(支持解压 tar、远程 URL)</td><td class="mono">ADD app.tar.gz /opt/</td></tr>
+        <tr><td class="mono"><b>RUN</b></td><td>构建时执行命令(装东西)</td><td class="mono">RUN apt-get install -y vim</td></tr>
+        <tr><td class="mono"><b>ENV</b></td><td>设置环境变量</td><td class="mono">ENV JAVA_OPTS="-Xmx512m"</td></tr>
+        <tr><td class="mono"><b>WORKDIR</b></td><td>设置工作目录</td><td class="mono">WORKDIR /app</td></tr>
+        <tr><td class="mono"><b>EXPOSE</b></td><td>声明端口(提示作用)</td><td class="mono">EXPOSE 8080</td></tr>
+        <tr><td class="mono"><b>CMD</b></td><td>容器启动时执行的命令</td><td class="mono">CMD ["catalina.sh","run"]</td></tr>
+        <tr><td class="mono"><b>ENTRYPOINT</b></td><td>容器入口(和 CMD 配合)</td><td class="mono">ENTRYPOINT ["java","-jar"]</td></tr>
+      </tbody>
+    </table>
+    <div class="tip-box">
+      <b>记忆口诀：</b>FROM 是地基、COPY 搬东西、RUN 装软件、CMD 是开机命令。看懂这四个，就基本能读懂 90% 的 Dockerfile。
+    </div>
+  </section>
+
+  <!-- Compose -->
+  <section class="card" id="compose">
+    <h2><span class="dot" style="background:#534ab7"></span>五、Docker Compose（一键编排多容器）</h2>
+    <div class="sub">一条命令启动「数据库 + 应用 + Nginx」整套服务</div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker compose up -d</span>    <span class="c">docker compose down</span></div>
+      <div class="desc"><b>up -d</b> 后台启动整套服务 · <b>down</b> 停止并移除整套 <span class="badge tip">面试加分</span></div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker compose ps</span>    <span class="c">docker compose logs -f 服务名</span></div>
+      <div class="desc"><b>ps</b> 看编排的服务状态 · <b>logs</b> 看某个服务的日志</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker compose restart 服务名</span></div>
+      <div class="desc"><b>restart</b> 重启某个服务，不用整堆一起重启</div>
+    </div>
+  </section>
+
+  <!-- 网络与数据卷 -->
+  <section class="card" id="net">
+    <h2><span class="dot" style="background:#185fa5"></span>六、网络与数据卷</h2>
+    <div class="sub">实施时最容易踩坑的两个点：网络不通、数据丢失</div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker network ls</span>    <span class="c">docker network inspect 网络名</span></div>
+      <div class="desc"><b>network ls</b> 看网络列表 · <b>inspect</b> 看网络里有哪些容器、各自 IP</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker volume ls</span>    <span class="c">docker volume inspect 卷名</span></div>
+      <div class="desc"><b>volume ls</b> 看数据卷列表 · <b>inspect</b> 看卷挂载到宿主机哪里(找回数据靠它)</div>
+    </div>
+
+    <div class="item">
+      <div class="cmd"><span class="c">docker cp 容器名:/路径 宿主机路径</span></div>
+      <div class="desc"><b>docker cp</b> 在宿主机和容器之间拷贝文件(如拷日志、拷配置)</div>
+    </div>
+  </section>
+
+  <footer>Docker 指令速查表 · 面向软件实施岗位 · 持续补充中</footer>
+</div>
+</body>
+</html>

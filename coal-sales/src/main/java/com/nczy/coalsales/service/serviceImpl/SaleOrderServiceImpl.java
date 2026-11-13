@@ -41,9 +41,22 @@ public class SaleOrderServiceImpl extends ServiceImpl<SaleOrderMapper, SaleOrder
     // ============ 订单号生成：DD + 年月日 + 3 位流水 ============
     private String genOrderNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = count(new LambdaQueryWrapper<SaleOrder>()
-                .likeRight(SaleOrder::getOrderNo, "DD" + date));
-        return "DD" + date + String.format("%03d", count + 1);
+        String prefix = "DD" + date;
+        String maxNo = saleOrderMapper.selectMaxOrderNo(prefix);
+        int nextSeq = nextSeq(maxNo, prefix);
+        return prefix + String.format("%03d", nextSeq);
+    }
+
+    // 从当天最大编号解析流水号并 +1，无记录则从 1 开始
+    private int nextSeq(String maxNo, String prefix) {
+        if (maxNo != null && maxNo.startsWith(prefix) && maxNo.length() > prefix.length()) {
+            try {
+                return Integer.parseInt(maxNo.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 编号格式异常时回退为 1
+            }
+        }
+        return 1;
     }
 
     // ============ 计算合同可下单上限 ============
@@ -137,23 +150,34 @@ public class SaleOrderServiceImpl extends ServiceImpl<SaleOrderMapper, SaleOrder
         order.setOrderNo(genOrderNo());
         save(order);
 
-        // ⑤ 判断合同是否用满 → 自动置"已完成"（R10）
-        BigDecimal newTotal = orderedTotal.add(dto.getPlanQty());
-        if (newTotal.compareTo(upperLimit) >= 0) {
-            Contract update = new Contract();
-            update.setId(contract.getId());
-            update.setStatus(ContractStatus.FINISHED);
-            contractService.updateById(update);
-        }
+
     }
 
     // ============ 修改（仅待发运） ============
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateOrder(Long id, SaleOrderUpdateDTO dto, LoginUser loginUser) {
         SaleOrder order = getOrder(id, loginUser);
         if (!SaleOrderStatus.WAIT_SHIP.equals(order.getStatus())) {
             throw new BusinessException("只有待发运状态的订单才能修改");
         }
+
+        // 修改同样不能突破合同上限：先扣除本单旧量，再加回新量
+        Contract contract = contractService.getById(order.getContractId());
+        if (contract == null) {
+            throw new BusinessException("合同不存在或已被删除");
+        }
+        BigDecimal upperLimit = calcUpperLimit(contract);
+        BigDecimal orderedTotal = saleOrderMapper.sumPlanQtyByContract(contract.getId());
+        BigDecimal oldPlanQty = order.getPlanQty() == null ? BigDecimal.ZERO : order.getPlanQty();
+        BigDecimal otherOrders = orderedTotal.subtract(oldPlanQty); // 排除本单旧量
+        BigDecimal newTotal = otherOrders.add(dto.getPlanQty());     // 换成本单新量
+
+        if (newTotal.compareTo(upperLimit) > 0) {
+            throw new BusinessException("修改后订单量超过合同剩余可下单量，剩余 "
+                    + upperLimit.subtract(otherOrders) + " 吨");
+        }
+
         SaleOrder update = new SaleOrder();
         update.setId(id);
         update.setPlanQty(dto.getPlanQty());
